@@ -973,14 +973,15 @@ export function PredigolApp() {
                 </li>
               ))}
             </ul>
-          ) : (
-            <EmptyState text="Aquí se guardan los análisis recientes en el navegador." />
-          )}
-        </section>
-      </div>
-    </div>
-  }
-      );
+       ) : (
+        <EmptyState text="Aquí se guardan los análisis recientes en el navegador." />
+      )}
+    </section>
+  </div>
+</div>
+  );
+}
+
 function humanizeKey(key: string) {
   return key
     .replace(/([A-Z])/g, ' $1')
