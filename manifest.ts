@@ -36,5 +36,5 @@ export default function manifest(): MetadataRoute.Manifest {
     type: 'image/png',
   },
 ],
-}',
+};
 }
