@@ -1099,6 +1099,3 @@ function MetricCard({
 function EmptyState({ text }: { text: string }) {
   return <p className="helper-text">{text}</p>;
 }
-  return <div className="empty-state">{text}</div>;
-}
-
