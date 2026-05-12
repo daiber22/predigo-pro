@@ -980,6 +980,7 @@ export function PredigolApp() {
   </div>
 </div>
   );
+   }   
 
 function humanizeKey(key: string) {
   return key
