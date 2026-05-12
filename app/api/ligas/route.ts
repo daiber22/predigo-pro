@@ -27,4 +27,19 @@ export async function GET() {
 
     const leagues = (payload?.response || []).map((item: any) => ({
       key: String(item.league?.id || ''),
-      label: item.league
+      label: item.league?.name || '',
+      league: item.league?.name || '',
+      country: item.country?.name || '',
+      season: item.seasons?.find((s: any) => s.current)?.year || new Date().getFullYear(),
+      logo: item.league?.logo || '',
+      type: item.league?.type || '',
+    }));
+
+    return NextResponse.json({ leagues });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error cargando ligas.' },
+      { status: 500 }
+    );
+  }
+}
