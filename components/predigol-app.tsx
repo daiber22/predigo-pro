@@ -565,10 +565,10 @@ export function PredigolApp() {
         </div>
       </section>
 <div className="grid two-columns">
-     <div className=\"grid two-columns\">
-       <section className="panel">
-         <header className="panel-header">
-          <div className=\"grid two-columns\">
+    <div className="grid two-columns">
+  <section className="panel">
+    <header className="panel-header">
+      <div>
               <p className="section-kicker">1. Partidos</p>
               <h2>Buscar partido</h2>
             </div>
