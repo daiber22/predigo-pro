@@ -51,6 +51,8 @@ type LeagueStatusSnapshot = {
   leagueStatuses: LeagueQuotaStatus[];
 };
 
+type LeagueOption = typeof LEAGUE_OPTIONS[number];
+
 const defaultLeague = getLeagueOption('colombia-primera-a') || LEAGUE_OPTIONS[0];
 
 const defaultForm: SearchFormState = {
@@ -113,9 +115,67 @@ export function PredigolApp() {
   const [lastGeneratedProfile, setLastGeneratedProfile] = useState<TicketProfile | null>(null);
   const [connections, setConnections] = useState<ConnectionStatus | null>(null);
   const [leagueSnapshot, setLeagueSnapshot] = useState<LeagueStatusSnapshot | null>(null);
+  const [allLeagueOptions, setAllLeagueOptions] = useState<LeagueOption[]>(LEAGUE_OPTIONS);
+  const [, setLoadingLeagueOptions] = useState(false);
 
-  const selectedLeague = getLeagueOption(form.leagueKey);
+  const selectedLeague =
+    allLeagueOptions.find((item) => item.key === form.leagueKey) || getLeagueOption(form.leagueKey);
   const selectedBookmaker = BOOKMAKER_OPTIONS.find((item) => item.value === oddsControls.bookmakerKey) || BOOKMAKER_OPTIONS[0];
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadLeagues() {
+      setLoadingLeagueOptions(true);
+
+      try {
+        const response = await fetch('/api/ligas', { cache: 'no-store' });
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.error || 'No se pudieron cargar las ligas.');
+        }
+
+        if (active && Array.isArray(payload.leagues) && payload.leagues.length > 0) {
+          const mergedOptions: LeagueOption[] = payload.leagues.map((league: any) => {
+            const existing = LEAGUE_OPTIONS.find(
+              (item) =>
+                item.league.toLowerCase() === String(league.league || '').toLowerCase() &&
+                item.country.toLowerCase() === String(league.country || '').toLowerCase(),
+            );
+
+            return existing
+              ? { ...league, ...existing }
+              : {
+                  key: String(league.key),
+                  label: `${league.country} - ${league.label}`,
+                  league: league.league,
+                  country: league.country,
+                  oddsSportKey: undefined,
+                  defaultSeason: Number(league.season) || new Date().getFullYear(),
+                };
+          });
+
+          const fixedKeys = new Set(LEAGUE_OPTIONS.map((item) => item.key));
+          const extraOptions = mergedOptions.filter((item) => !fixedKeys.has(item.key));
+
+          setAllLeagueOptions([...LEAGUE_OPTIONS, ...extraOptions]);
+        }
+      } catch (error) {
+        console.error('No se pudieron cargar las ligas:', error);
+      } finally {
+        if (active) {
+          setLoadingLeagueOptions(false);
+        }
+      }
+    }
+
+    loadLeagues();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const savedTicket = window.localStorage.getItem(ticketStorageKey);
@@ -193,7 +253,9 @@ export function PredigolApp() {
   }, [leagueStatusMap, selectedLeague]);
 
   function applyLeagueKey(leagueKey: string) {
-    const option = getLeagueOption(leagueKey);
+    const option =
+      allLeagueOptions.find((item) => item.key === leagueKey) || getLeagueOption(leagueKey);
+
     setForm((current: SearchFormState) => ({
       ...current,
       leagueKey,
@@ -303,58 +365,47 @@ export function PredigolApp() {
       setLoading(null);
     }
   }
-async function handleLoadExample() {
-  const exampleForm = defaultForm;
-  setForm(exampleForm);
-  setLoading('fixture');
-  setMessage('');
 
-  try {
-    const response = await fetch('/api/search-fixture', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        homeTeam: exampleForm.homeTeam,
-        awayTeam: exampleForm.awayTeam,
-        leagueKey: exampleForm.leagueKey,
-        league: exampleForm.league,
-        country: exampleForm.country,
-        season: Number(exampleForm.season),
-        matchDate: exampleForm.matchDate,
-      }),
-    });
+  async function handleLoadExample() {
+    const exampleForm = defaultForm;
 
-    const payload = await response.json();
-if (!response.ok) {
-  throw new Error(payload.error || 'No se pudo cargar el ejemplo.');
-}
+    setForm(exampleForm);
+    setLoading('fixture');
+    setMessage('');
 
-setFixture(payload.fixture);
-setOdds(null);
-setAnalysis(null);
-setMessage(
-  payload.fixture?.source === 'mock'
-    ? 'Ejemplo cargado con demo fallback.'
-    : 'Ejemplo cargado y estadísticas listas.'
-);
-    if (!response.ok) {
-      throw new Error(payload.error || 'No se pudo cargar el ejemplo.');
+    try {
+      const response = await fetch('/api/search-fixture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          homeTeam: exampleForm.homeTeam,
+          awayTeam: exampleForm.awayTeam,
+          leagueKey: exampleForm.leagueKey,
+          league: exampleForm.league,
+          country: exampleForm.country,
+          season: Number(exampleForm.season),
+          matchDate: exampleForm.matchDate,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || 'No se pudo cargar el ejemplo.');
+      }
+
+      setFixture(payload.fixture);
+      setOdds(null);
+      setAnalysis(null);
+      setMessage(
+        payload.fixture?.source === 'mock'
+          ? 'Ejemplo cargado con demo fallback.'
+          : 'Ejemplo cargado y estadísticas listas.',
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No se pudo cargar el ejemplo.');
+    } finally {
+      setLoading(null);
     }
-
-    setFixture(payload.fixture);
-    setOdds(null);
-    setAnalysis(null);
-    setMessage(
-      payload.fixture?.source === 'mock'
-        ? 'Ejemplo cargado con demo fallback.'
-        : 'Ejemplo cargado y estadísticas listas.'
-    );
-  } catch (error) {
-    setMessage(error instanceof Error ? error.message : 'No se pudo cargar el ejemplo.');
-  } finally {
-    setLoading(null);
   }
-}
   async function handleAnalyze() {
     if (!fixture) return;
     setLoading('analysis');
@@ -414,7 +465,7 @@ setMessage(
       setAnalysis(analyzePayload.analysis);
       setHistory((current: AnalysisResult[]) => [analyzePayload.analysis, ...current].slice(0, 30));
 
-      const currentLeague = getLeagueOption(fixture.leagueKey);
+      const currentLeague = allLeagueOptions.find((item) => item.key === fixture.leagueKey) || getLeagueOption(fixture.leagueKey);
       const fallbackReason = !fixture.oddsSportKey && currentLeague
         ? `Cuotas en demo fallback: ${currentLeague.label} no tiene sport key configurado dentro de la app.`
         : 'Cuotas cargadas en demo fallback porque faltó coincidencia exacta o la app está configurada para permitirlo.';
@@ -495,17 +546,17 @@ setMessage(
   }
 
   return (
-    <div className="app-shell">
-      <section className="hero-card">
+    <div className=\"app-shell\">
+      <section className=\"hero-card\">
         <div>
-          <p className="eyebrow">PrediGol Pro v8</p>
+          <p className=\"eyebrow\">PrediGol Pro v8</p>
           <h1>Estado de conexión guardado y ligas marcadas según cuotas reales</h1>
-          <p className="hero-copy">
+          <p className=\"hero-copy\">
             Ahora la app recuerda el último estado de conexión, valida de una sola vez las ligas cargadas dentro del proyecto
             y marca en rojo las que no tienen sport key real o que hoy no aparecen disponibles en The Odds API.
           </p>
         </div>
-        <div className="hero-meta">
+        <div className=\"hero-meta\">
           <span>Modo: {fixture?.source === 'api-football' ? 'API real' : 'Demo / mock'}</span>
           <span>Liga activa: {selectedLeague?.label || form.league}</span>
           <span>Bookmaker: {selectedBookmaker.label}</span>
@@ -514,21 +565,21 @@ setMessage(
         </div>
       </section>
 
-      <div className="grid two-columns">
-        <section className="panel">
-          <header className="panel-header">
+      <div className=\"grid two-columns\">
+        <section className=\"panel\">
+          <header className=\"panel-header\">
             <div>
-              <p className="section-kicker">1. Partidos</p>
+              <p className=\"section-kicker\">1. Partidos</p>
               <h2>Buscar partido</h2>
             </div>
           </header>
 
-          <div className="form-grid">
+          <div className=\"form-grid\">
             <SelectField
-              label="Liga rápida"
+              label=\"Liga rápida\"
               value={form.leagueKey}
               onChange={applyLeagueKey}
-              options={LEAGUE_OPTIONS.map((item) => {
+              options={allLeagueOptions.map((item) => {
                 const status = leagueStatusMap[item.key]?.status || (!item.oddsSportKey ? 'missing_sport_key' : 'unchecked');
                 return {
                   value: item.key,
@@ -536,54 +587,54 @@ setMessage(
                 };
               })}
             />
-            <Input label="Temporada" value={form.season} onChange={(value) => setForm({ ...form, season: value })} />
-            <Input label="Equipo local" value={form.homeTeam} onChange={(value) => setForm({ ...form, homeTeam: value })} />
-            <Input label="Equipo visitante" value={form.awayTeam} onChange={(value) => setForm({ ...form, awayTeam: value })} />
-            <Input label="Liga" value={form.league} onChange={(value) => setForm({ ...form, league: value })} />
-            <Input label="País" value={form.country} onChange={(value) => setForm({ ...form, country: value })} />
-            <Input label="Fecha" type="date" value={form.matchDate} onChange={(value) => setForm({ ...form, matchDate: value })} />
+            <Input label=\"Temporada\" value={form.season} onChange={(value) => setForm({ ...form, season: value })} />
+            <Input label=\"Equipo local\" value={form.homeTeam} onChange={(value) => setForm({ ...form, homeTeam: value })} />
+            <Input label=\"Equipo visitante\" value={form.awayTeam} onChange={(value) => setForm({ ...form, awayTeam: value })} />
+            <Input label=\"Liga\" value={form.league} onChange={(value) => setForm({ ...form, league: value })} />
+            <Input label=\"País\" value={form.country} onChange={(value) => setForm({ ...form, country: value })} />
+            <Input label=\"Fecha\" type=\"date\" value={form.matchDate} onChange={(value) => setForm({ ...form, matchDate: value })} />
           </div>
 
           <div className={`quick-league-note status-${getStatusTone(currentLeagueStatus?.status)}`}>
             <span>Sport key cuotas:</span>
             <strong>{selectedLeague?.oddsSportKey || 'No configurado en app / usa demo'}</strong>
-            <span className="status-inline">{getStatusIcon(currentLeagueStatus?.status)} {getStatusLabel(currentLeagueStatus?.status)}</span>
+            <span className=\"status-inline\">{getStatusIcon(currentLeagueStatus?.status)} {getStatusLabel(currentLeagueStatus?.status)}</span>
           </div>
 
-          <div className="actions-row">
-            <button className="primary" onClick={handleSearchFixture} disabled={loading === 'fixture'}>
+          <div className=\"actions-row\">
+            <button className=\"primary\" onClick={handleSearchFixture} disabled={loading === 'fixture'}>
               {loading === 'fixture' ? 'Buscando...' : 'Buscar partido'}
             </button>
-            <button className="secondary" onClick={handleTestConnections} disabled={loading === 'connections' || loading === 'league-status'}>
+            <button className=\"secondary\" onClick={handleTestConnections} disabled={loading === 'connections' || loading === 'league-status'}>
               {loading === 'connections' ? 'Probando...' : 'Probar conexión API'}
             </button>
-            <button className="secondary" onClick={() => handleValidateLeagues(true)} disabled={loading === 'league-status' || loading === 'connections'}>
+            <button className=\"secondary\" onClick={() => handleValidateLeagues(true)} disabled={loading === 'league-status' || loading === 'connections'}>
               {loading === 'league-status' ? 'Validando ligas...' : 'Validar ligas cuotas'}
             </button>
-           <button className="secondary" onClick={handleLoadExample}>
-  Cargar ejemplo
-</button>
+            <button className=\"secondary\" onClick={handleLoadExample}>
+              Cargar ejemplo
+            </button>
           </div>
 
           {connections && (
-            <div className="fixture-card">
-              <div className="panel-header">
+            <div className=\"fixture-card\">
+              <div className=\"panel-header\">
                 <div>
-                  <p className="section-kicker">Estado API</p>
+                  <p className=\"section-kicker\">Estado API</p>
                   <h3>Conexiones activas</h3>
                 </div>
-                <span className="pill">Demo fallback: {connections.demoFallback ? 'Activo' : 'Apagado'}</span>
+                <span className=\"pill\">Demo fallback: {connections.demoFallback ? 'Activo' : 'Apagado'}</span>
               </div>
 
-              <div className="stats-grid">
-                <div className="stat-card">
+              <div className=\"stats-grid\">
+                <div className=\"stat-card\">
                   <h3>API-Football</h3>
                   <p><strong>Configurada:</strong> {connections.apiFootball.configured ? 'Sí' : 'No'}</p>
                   <p><strong>Estado:</strong> {connections.apiFootball.ok ? 'OK' : 'Revisar'}</p>
                   <p>{connections.apiFootball.message}</p>
                 </div>
 
-                <div className="stat-card">
+                <div className=\"stat-card\">
                   <h3>The Odds API</h3>
                   <p><strong>Configurada:</strong> {connections.oddsApi.configured ? 'Sí' : 'No'}</p>
                   <p><strong>Estado:</strong> {connections.oddsApi.ok ? 'OK' : 'Revisar'}</p>
@@ -595,16 +646,16 @@ setMessage(
             </div>
           )}
 
-          <div className="fixture-card league-map-card">
-            <div className="panel-header">
+          <div className=\"fixture-card league-map-card\">
+            <div className=\"panel-header\">
               <div>
-                <p className="section-kicker">Mapa de ligas</p>
+                <p className=\"section-kicker\">Mapa de ligas</p>
                 <h3>Cuotas reales por liga</h3>
               </div>
-              <span className="pill">Última validación: {formatCheckedAt(leagueSnapshot?.checkedAt)}</span>
+              <span className=\"pill\">Última validación: {formatCheckedAt(leagueSnapshot?.checkedAt)}</span>
             </div>
 
-            <div className="league-status-grid">
+            <div className=\"league-status-grid\">
               {LEAGUE_OPTIONS.map((item) => {
                 const status = leagueStatusMap[item.key] || (!item.oddsSportKey
                   ? {
@@ -625,11 +676,11 @@ setMessage(
                 return (
                   <button
                     key={item.key}
-                    type="button"
+                    type=\"button\"
                     className={`league-status-card tone-${getStatusTone(status.status)} ${active ? 'active' : ''}`}
                     onClick={() => applyLeagueKey(item.key)}
                   >
-                    <div className="league-status-top">
+                    <div className=\"league-status-top\">
                       <strong>{getStatusIcon(status.status)} {item.label}</strong>
                       <span className={`status-badge tone-${getStatusTone(status.status)}`}>{getStatusLabel(status.status)}</span>
                     </div>
@@ -642,7 +693,7 @@ setMessage(
           </div>
 
           {fixture && (
-            <div className="fixture-card">
+            <div className=\"fixture-card\">
               <div>
                 <strong>
                   {fixture.stats.homeTeam} vs {fixture.stats.awayTeam}
@@ -651,45 +702,44 @@ setMessage(
                   {fixture.leagueName} · {fixture.round || 'Sin ronda'} · {fixture.matchDate || 'Fecha por definir'}
                 </p>
               </div>
-              <div className="pill-row">
-                <span className="pill">{fixture.country || 'País'}</span>
-                <span className="pill">Temporada {fixture.season || '-'}</span>
-                <span className="pill">ID {fixture.fixtureId}</span>
+              <div className=\"pill-row\">
+                <span className=\"pill\">{fixture.country || 'País'}</span>
+                <span className=\"pill\">Temporada {fixture.season || '-'}</span>
+                <span className=\"pill\">ID {fixture.fixtureId}</span>
               </div>
             </div>
           )}
 
-          {message ? <p className="helper-text">{message}</p> : null}
+          {message ? <p className=\"helper-text\">{message}</p> : null}
         </section>
 
-        <section className="panel">
-          <header className="panel-header">
+        <section className=\"panel\">
+          <header className=\"panel-header\">
             <div>
-              <p className="section-kicker">2. Estadísticas</p>
+              <p className=\"section-kicker\">2. Estadísticas</p>
               <h2>Datos automáticos editables</h2>
             </div>
           </header>
 
           {fixture ? (
-            <div className="stats-grid">
-              <StatEditor title={fixture.stats.homeTeam} side="home" stats={fixture.stats} onUpdate={updateStats} />
-              <StatEditor title={fixture.stats.awayTeam} side="away" stats={fixture.stats} onUpdate={updateStats} />
+            <div className=\"stats-grid\">
+              <StatEditor title={fixture.stats.homeTeam} side=\"home\" stats={fixture.stats} onUpdate={updateStats} />
+              <StatEditor title={fixture.stats.awayTeam} side=\"away\" stats={fixture.stats} onUpdate={updateStats} />
             </div>
           ) : (
-            <EmptyState text="Primero busca un partido para cargar estadísticas." />
+            <EmptyState text=\"Primero busca un partido para cargar estadísticas.\" />
           )}
 
-          <div className="actions-row">
-            <button className="primary" onClick={handleAnalyze} disabled={!canAnalyze || loading === 'analysis'}>
+          <div className=\"actions-row\">
+            <button className=\"primary\" onClick={handleAnalyze} disabled={!canAnalyze || loading === 'analysis'}>
               {loading === 'analysis' ? 'Analizando...' : 'Analizar partido'}
             </button>
-            <button className="secondary" onClick={handleLoadOdds} disabled={!fixture || loading === 'odds'}>
+            <button className=\"secondary\" onClick={handleLoadOdds} disabled={!fixture || loading === 'odds'}>
               {loading === 'odds' ? 'Cargando cuotas...' : 'Traer cuotas'}
             </button>
           </div>
         </section>
       </div>
-
       <div className="grid two-columns">
         <section className="panel">
           <header className="panel-header">
