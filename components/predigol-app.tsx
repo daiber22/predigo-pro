@@ -546,17 +546,17 @@ export function PredigolApp() {
   }
 
   return (
-    <div className=\"app-shell\">
-      <section className=\"hero-card\">
+    <div className="app-shell">
+     <section className="hero-card">
         <div>
-          <p className=\"eyebrow\">PrediGol Pro v8</p>
+         <p className="eyebrow">PrediGol Pro v8</p>
           <h1>Estado de conexión guardado y ligas marcadas según cuotas reales</h1>
-          <p className=\"hero-copy\">
+     <p className="hero-copy">
             Ahora la app recuerda el último estado de conexión, valida de una sola vez las ligas cargadas dentro del proyecto
             y marca en rojo las que no tienen sport key real o que hoy no aparecen disponibles en The Odds API.
           </p>
         </div>
-        <div className=\"hero-meta\">
+      <div className="hero-meta">
           <span>Modo: {fixture?.source === 'api-football' ? 'API real' : 'Demo / mock'}</span>
           <span>Liga activa: {selectedLeague?.label || form.league}</span>
           <span>Bookmaker: {selectedBookmaker.label}</span>
@@ -564,19 +564,19 @@ export function PredigolApp() {
           <span>Ligas validadas OK: {validatedLeagueCount}</span>
         </div>
       </section>
-
-      <div className=\"grid two-columns\">
-        <section className=\"panel\">
-          <header className=\"panel-header\">
-            <div>
-              <p className=\"section-kicker\">1. Partidos</p>
+<div className="grid two-columns">
+     <div className=\"grid two-columns\">
+       <section className="panel">
+         <header className="panel-header">
+          <div className=\"grid two-columns\">
+              <p className="section-kicker">1. Partidos</p>
               <h2>Buscar partido</h2>
             </div>
           </header>
 
-          <div className=\"form-grid\">
+        <div className="form-grid">
             <SelectField
-              label=\"Liga rápida\"
+            label="Liga rápida"
               value={form.leagueKey}
               onChange={applyLeagueKey}
               options={allLeagueOptions.map((item) => {
@@ -587,54 +587,54 @@ export function PredigolApp() {
                 };
               })}
             />
-            <Input label=\"Temporada\" value={form.season} onChange={(value) => setForm({ ...form, season: value })} />
-            <Input label=\"Equipo local\" value={form.homeTeam} onChange={(value) => setForm({ ...form, homeTeam: value })} />
-            <Input label=\"Equipo visitante\" value={form.awayTeam} onChange={(value) => setForm({ ...form, awayTeam: value })} />
-            <Input label=\"Liga\" value={form.league} onChange={(value) => setForm({ ...form, league: value })} />
-            <Input label=\"País\" value={form.country} onChange={(value) => setForm({ ...form, country: value })} />
-            <Input label=\"Fecha\" type=\"date\" value={form.matchDate} onChange={(value) => setForm({ ...form, matchDate: value })} />
+         <Input label="Temporada" value={form.season} onChange={(value) => setForm({ ...form, season: value })} />
+         <Input label="Equipo local" value={form.homeTeam} onChange={(value) => setForm({ ...form, homeTeam: value })} />
+          <Input label="Equipo visitante" value={form.awayTeam} onChange={(value) => setForm({ ...form, awayTeam: value })} />
+          <Input label="Liga" value={form.league} onChange={(value) => setForm({ ...form, league: value })} />
+         <Input label="País" value={form.country} onChange={(value) => setForm({ ...form, country: value })} />
+          <Input label="Fecha" type="date" value={form.matchDate} onChange={(value) => setForm({ ...form, matchDate: value })} />
           </div>
 
           <div className={`quick-league-note status-${getStatusTone(currentLeagueStatus?.status)}`}>
             <span>Sport key cuotas:</span>
             <strong>{selectedLeague?.oddsSportKey || 'No configurado en app / usa demo'}</strong>
-            <span className=\"status-inline\">{getStatusIcon(currentLeagueStatus?.status)} {getStatusLabel(currentLeagueStatus?.status)}</span>
+          <span className="status-inline">{getStatusIcon(currentLeagueStatus?.status)} {getStatusLabel(currentLeagueStatus?.status)}</span>
           </div>
 
-          <div className=\"actions-row\">
-            <button className=\"primary\" onClick={handleSearchFixture} disabled={loading === 'fixture'}>
+          <div className="actions-row">
+          <button className="primary" onClick={handleSearchFixture} disabled={loading === 'fixture'}>
               {loading === 'fixture' ? 'Buscando...' : 'Buscar partido'}
             </button>
-            <button className=\"secondary\" onClick={handleTestConnections} disabled={loading === 'connections' || loading === 'league-status'}>
+           <button className="secondary" onClick={handleTestConnections} disabled={loading === 'connections' || loading === 'league-status'}>
               {loading === 'connections' ? 'Probando...' : 'Probar conexión API'}
             </button>
-            <button className=\"secondary\" onClick={() => handleValidateLeagues(true)} disabled={loading === 'league-status' || loading === 'connections'}>
+           <button className="secondary" onClick={() => handleValidateLeagues(true)} disabled={loading === 'league-status' || loading === 'connections'}>
               {loading === 'league-status' ? 'Validando ligas...' : 'Validar ligas cuotas'}
             </button>
-            <button className=\"secondary\" onClick={handleLoadExample}>
+           <button className="secondary" onClick={handleLoadExample}>
               Cargar ejemplo
             </button>
           </div>
 
           {connections && (
-            <div className=\"fixture-card\">
-              <div className=\"panel-header\">
+            <div className="fixture-card">
+             <div className="panel-header">
                 <div>
-                  <p className=\"section-kicker\">Estado API</p>
+               <p className="section-kicker">Estado API</p>
                   <h3>Conexiones activas</h3>
                 </div>
-                <span className=\"pill\">Demo fallback: {connections.demoFallback ? 'Activo' : 'Apagado'}</span>
+               <span className="pill">Demo fallback: {connections.demoFallback ? 'Activo' : 'Apagado'}</span>
               </div>
 
-              <div className=\"stats-grid\">
-                <div className=\"stat-card\">
+             <div className="stats-grid">
+               <div className="stat-card">
                   <h3>API-Football</h3>
                   <p><strong>Configurada:</strong> {connections.apiFootball.configured ? 'Sí' : 'No'}</p>
                   <p><strong>Estado:</strong> {connections.apiFootball.ok ? 'OK' : 'Revisar'}</p>
                   <p>{connections.apiFootball.message}</p>
                 </div>
 
-                <div className=\"stat-card\">
+               <div className="stat-card">
                   <h3>The Odds API</h3>
                   <p><strong>Configurada:</strong> {connections.oddsApi.configured ? 'Sí' : 'No'}</p>
                   <p><strong>Estado:</strong> {connections.oddsApi.ok ? 'OK' : 'Revisar'}</p>
@@ -646,16 +646,16 @@ export function PredigolApp() {
             </div>
           )}
 
-          <div className=\"fixture-card league-map-card\">
-            <div className=\"panel-header\">
+          <div className="fixture-card league-map-card">
+           <div className="panel-header">
               <div>
-                <p className=\"section-kicker\">Mapa de ligas</p>
+                <p className="section-kicker">Mapa de ligas</p>
                 <h3>Cuotas reales por liga</h3>
               </div>
-              <span className=\"pill\">Última validación: {formatCheckedAt(leagueSnapshot?.checkedAt)}</span>
+              <span className="pill">Última validación: {formatCheckedAt(leagueSnapshot?.checkedAt)}</span>
             </div>
 
-            <div className=\"league-status-grid\">
+           <div className="league-status-grid">
               {LEAGUE_OPTIONS.map((item) => {
                 const status = leagueStatusMap[item.key] || (!item.oddsSportKey
                   ? {
@@ -676,11 +676,11 @@ export function PredigolApp() {
                 return (
                   <button
                     key={item.key}
-                    type=\"button\"
+                    type="button"
                     className={`league-status-card tone-${getStatusTone(status.status)} ${active ? 'active' : ''}`}
                     onClick={() => applyLeagueKey(item.key)}
                   >
-                    <div className=\"league-status-top\">
+                   <div className="league-status-top">
                       <strong>{getStatusIcon(status.status)} {item.label}</strong>
                       <span className={`status-badge tone-${getStatusTone(status.status)}`}>{getStatusLabel(status.status)}</span>
                     </div>
@@ -693,7 +693,7 @@ export function PredigolApp() {
           </div>
 
           {fixture && (
-            <div className=\"fixture-card\">
+           <div className="fixture-card">
               <div>
                 <strong>
                   {fixture.stats.homeTeam} vs {fixture.stats.awayTeam}
@@ -702,39 +702,39 @@ export function PredigolApp() {
                   {fixture.leagueName} · {fixture.round || 'Sin ronda'} · {fixture.matchDate || 'Fecha por definir'}
                 </p>
               </div>
-              <div className=\"pill-row\">
-                <span className=\"pill\">{fixture.country || 'País'}</span>
-                <span className=\"pill\">Temporada {fixture.season || '-'}</span>
-                <span className=\"pill\">ID {fixture.fixtureId}</span>
+             <div className="pill-row">
+               <span className="pill">{fixture.country || 'País'}</span>
+                <span className="pill">Temporada {fixture.season || '-'}</span>
+               <span className="pill">ID {fixture.fixtureId}</span>
               </div>
             </div>
           )}
 
-          {message ? <p className=\"helper-text\">{message}</p> : null}
+          {message ? <p className="helper-text">{message}</p> : null}
         </section>
 
-        <section className=\"panel\">
-          <header className=\"panel-header\">
+        <section className="panel">
+          <header className="panel-header">
             <div>
-              <p className=\"section-kicker\">2. Estadísticas</p>
+             <p className="section-kicker">2. Estadísticas</p>
               <h2>Datos automáticos editables</h2>
             </div>
           </header>
 
           {fixture ? (
-            <div className=\"stats-grid\">
-              <StatEditor title={fixture.stats.homeTeam} side=\"home\" stats={fixture.stats} onUpdate={updateStats} />
-              <StatEditor title={fixture.stats.awayTeam} side=\"away\" stats={fixture.stats} onUpdate={updateStats} />
+            <div className="stats-grid">
+              <StatEditor title={fixture.stats.homeTeam} side="home" stats={fixture.stats} onUpdate={updateStats} />
+             <StatEditor title={fixture.stats.awayTeam} side="away" stats={fixture.stats} onUpdate={updateStats} />
             </div>
           ) : (
-            <EmptyState text=\"Primero busca un partido para cargar estadísticas.\" />
+           <EmptyState text="Primero busca un partido para cargar estadísticas." />
           )}
 
-          <div className=\"actions-row\">
-            <button className=\"primary\" onClick={handleAnalyze} disabled={!canAnalyze || loading === 'analysis'}>
+         <div className="actions-row">
+           <button className="primary" onClick={handleAnalyze} disabled={!canAnalyze || loading === 'analysis'}>
               {loading === 'analysis' ? 'Analizando...' : 'Analizar partido'}
             </button>
-            <button className=\"secondary\" onClick={handleLoadOdds} disabled={!fixture || loading === 'odds'}>
+          <button className="secondary" onClick={handleLoadOdds} disabled={!fixture || loading === 'odds'}>
               {loading === 'odds' ? 'Cargando cuotas...' : 'Traer cuotas'}
             </button>
           </div>
