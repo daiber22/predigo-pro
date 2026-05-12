@@ -979,7 +979,8 @@ export function PredigolApp() {
         </section>
       </div>
     </div>
-  );
+  }
+      );
 function humanizeKey(key: string) {
   return key
     .replace(/([A-Z])/g, ' $1')
