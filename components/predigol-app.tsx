@@ -303,7 +303,58 @@ export function PredigolApp() {
       setLoading(null);
     }
   }
+async function handleLoadExample() {
+  const exampleForm = defaultForm;
+  setForm(exampleForm);
+  setLoading('fixture');
+  setMessage('');
 
+  try {
+    const response = await fetch('/api/search-fixture', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        homeTeam: exampleForm.homeTeam,
+        awayTeam: exampleForm.awayTeam,
+        leagueKey: exampleForm.leagueKey,
+        league: exampleForm.league,
+        country: exampleForm.country,
+        season: Number(exampleForm.season),
+        matchDate: exampleForm.matchDate,
+      }),
+    });
+
+    const payload = await response.json();
+if (!response.ok) {
+  throw new Error(payload.error || 'No se pudo cargar el ejemplo.');
+}
+
+setFixture(payload.fixture);
+setOdds(null);
+setAnalysis(null);
+setMessage(
+  payload.fixture?.source === 'mock'
+    ? 'Ejemplo cargado con demo fallback.'
+    : 'Ejemplo cargado y estadísticas listas.'
+);
+    if (!response.ok) {
+      throw new Error(payload.error || 'No se pudo cargar el ejemplo.');
+    }
+
+    setFixture(payload.fixture);
+    setOdds(null);
+    setAnalysis(null);
+    setMessage(
+      payload.fixture?.source === 'mock'
+        ? 'Ejemplo cargado con demo fallback.'
+        : 'Ejemplo cargado y estadísticas listas.'
+    );
+  } catch (error) {
+    setMessage(error instanceof Error ? error.message : 'No se pudo cargar el ejemplo.');
+  } finally {
+    setLoading(null);
+  }
+}
   async function handleAnalyze() {
     if (!fixture) return;
     setLoading('analysis');
@@ -509,9 +560,9 @@ export function PredigolApp() {
             <button className="secondary" onClick={() => handleValidateLeagues(true)} disabled={loading === 'league-status' || loading === 'connections'}>
               {loading === 'league-status' ? 'Validando ligas...' : 'Validar ligas cuotas'}
             </button>
-            <button className="secondary" onClick={() => setForm(defaultForm)}>
-              Cargar ejemplo
-            </button>
+           <button className="secondary" onClick={handleLoadExample}>
+  Cargar ejemplo
+</button>
           </div>
 
           {connections && (
