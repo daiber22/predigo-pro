@@ -957,30 +957,31 @@ export function PredigolApp() {
             </div>
           </header>
 
-          {history.length ? (
-            <ul className="history-list">
-              {history.slice(0, 8).map((item, index) => (
-                <li key={`${item.homeTeam}-${item.awayTeam}-${index}`}>
-                  <div>
-                    <strong>
-                      {item.homeTeam} vs {item.awayTeam}
-                    </strong>
-                    <p>
-                      {item.recommendation.mainPick} · {item.confidence} · {item.poissonTop1}
-                    </p>
-                  </div>
-                  <span className="pill">{item.totalLambda}</span>
-                </li>
-              ))}
-            </ul>
-       ) : (
-        <EmptyState text="Aquí se guardan los análisis recientes en el navegador." />
-      )}
+         {history.length ? (
+  <ul className="history-list">
+    {history.slice(0, 8).map((item, index) => (
+      <li key={`${item.homeTeam}-${item.awayTeam}-${index}`}>
+        <div>
+          <strong>
+            {item.homeTeam} vs {item.awayTeam}
+          </strong>
+          <p>
+            {item.recommendation.mainPick} · {item.confidence} · {item.poissonTop1}
+          </p>
+        </div>
+        <span className="pill">{item.totalLambda}</span>
+      </li>
+    ))}
+  </ul>
+) : (
+  <EmptyState text="Aquí se guardan los análisis recientes en el navegador." />
+)}
     </section>
   </div>
 </div>
   );
 }
+
 function humanizeKey(key: string) {
   return key
     .replace(/([A-Z])/g, ' $1')
@@ -1091,7 +1092,6 @@ function MetricCard({
   return (
     <article className="metric-card">
       <span>{label}</span>
-      
       <strong>{value}</strong>
       <small>{helper}</small>
     </article>
@@ -1101,5 +1101,3 @@ function MetricCard({
 function EmptyState({ text }: { text: string }) {
   return <p className="helper-text">{text}</p>;
 }
-}
-    
