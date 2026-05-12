@@ -163,7 +163,7 @@ export async function getOddsForFixture(
   fixture: FixtureMatch,
   options: OddsLookupOptions = {},
 ): Promise<OddsResponse> {
-  const comparisonMarkets = options.comparisonMarkets?.length
+const comparisonMarkets: OddsMarketKey[] = options.comparisonMarkets?.length
     ? options.comparisonMarkets
     : ['1x2', 'totals', 'btts', 'double_chance'];
 
