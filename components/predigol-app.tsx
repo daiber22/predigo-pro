@@ -980,13 +980,32 @@ export function PredigolApp() {
       </div>
     </div>
   );
+function humanizeKey(key: string) {
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .replace(/^./, (letter) => letter.toUpperCase());
 }
 
-function Input({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
+function Input({
+  label,
+  value,
+  onChange,
+  type = 'text',
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+}) {
   return (
     <label className="field">
       <span>{label}</span>
-      <input type={type} value={value} onChange={(event: { target: { value: string } }) => onChange(event.target.value)} />
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </label>
   );
 }
@@ -1005,7 +1024,7 @@ function SelectField({
   return (
     <label className="field">
       <span>{label}</span>
-      <select value={value} onChange={(event: { target: { value: string } }) => onChange(event.target.value)}>
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
@@ -1027,33 +1046,22 @@ function StatEditor({
   stats: TeamStatsInput;
   onUpdate: (patch: Partial<TeamStatsInput>) => void;
 }) {
-  const prefix = side === 'home' ? 'home' : 'away';
-  const labels = side === 'home'
-    ? [
-        ['homeGoalsForGeneral', 'GF general'],
-        ['homeGoalsAgainstGeneral', 'GC general'],
-        ['homeGoalsForHome', 'GF local'],
-        ['homeGoalsAgainstHome', 'GC local'],
-      ]
-    : [
-        ['awayGoalsForGeneral', 'GF general'],
-        ['awayGoalsAgainstGeneral', 'GC general'],
-        ['awayGoalsForAway', 'GF visita'],
-        ['awayGoalsAgainstAway', 'GC visita'],
-      ];
+  const numericEntries = Object.entries(stats).filter(
+    ([key, value]) => typeof value === 'number' && key !== 'fixtureId'
+  );
 
   return (
-    <div className="stat-card">
+    <div className="stat-editor">
       <h3>{title}</h3>
-      <div className="mini-grid">
-        {labels.map(([key, label]) => (
-          <label className="field" key={key}>
-            <span>{label}</span>
+
+      <div className="form-grid">
+        {numericEntries.map(([key, value]) => (
+          <label key={key} className="field">
+            <span>{humanizeKey(key)}</span>
             <input
               type="number"
-              step="0.01"
-              value={String((stats as unknown as Record<string, number>)[key])}
-              onChange={(event: { target: { value: string } }) =>
+              value={String(value)}
+              onChange={(event) =>
                 onUpdate({
                   [key]: Number(event.target.value),
                 } as Partial<TeamStatsInput>)
@@ -1062,12 +1070,23 @@ function StatEditor({
           </label>
         ))}
       </div>
-      <p className="muted">Últimos 5 partidos del lado {prefix === 'home' ? 'local' : 'visitante'}.</p>
+
+      <p className="muted">
+        Últimos 5 partidos del lado {side === 'home' ? 'local' : 'visitante'}.
+      </p>
     </div>
   );
 }
 
-function MetricCard({ label, value, helper }: { label: string; value: string; helper: string }) {
+function MetricCard({
+  label,
+  value,
+  helper,
+}: {
+  label: string;
+  value: string;
+  helper: string;
+}) {
   return (
     <article className="metric-card">
       <span>{label}</span>
@@ -1078,6 +1097,8 @@ function MetricCard({ label, value, helper }: { label: string; value: string; he
 }
 
 function EmptyState({ text }: { text: string }) {
+  return <p className="helper-text">{text}</p>;
+}
   return <div className="empty-state">{text}</div>;
 }
 
