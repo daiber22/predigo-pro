@@ -454,6 +454,9 @@ export default function Page() {
   const [visitante, setVisitante] = useState<TeamForm>(buildInitialTeam());
   const [result, setResult] = useState<any>(null);
   const [message, setMessage] = useState("");
+  const [activeTab, setActiveTab] = useState<
+  "info" | "local" | "visitante" | "resultado" | "historial"
+>("info");
   const [matchInfo, setMatchInfo] = useState<MatchInfo>({
   league: "",
   date: "",
@@ -601,8 +604,70 @@ function deleteSavedAnalysis(id: string) {
           La app usa 40% general, 60% local/visitante, y mezcla 70% goles con 30%
           componente de remates.
         </p>
+        <div className="mb-6 flex flex-wrap gap-2 rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-3">
+  <button
+    onClick={() => setActiveTab("info")}
+    className={`rounded-xl px-4 py-2 font-semibold ${
+      activeTab === "info"
+        ? "bg-cyan-400 text-slate-950"
+        : "bg-slate-800 text-white hover:bg-slate-700"
+    }`}
+  >
+    Información
+  </button>
 
-        <div className="mb-6 rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-4">
+  <button
+    onClick={() => setActiveTab("local")}
+    className={`rounded-xl px-4 py-2 font-semibold ${
+      activeTab === "local"
+        ? "bg-cyan-400 text-slate-950"
+        : "bg-slate-800 text-white hover:bg-slate-700"
+    }`}
+  >
+    Local
+  </button>
+
+  <button
+    onClick={() => setActiveTab("visitante")}
+    className={`rounded-xl px-4 py-2 font-semibold ${
+      activeTab === "visitante"
+        ? "bg-cyan-400 text-slate-950"
+        : "bg-slate-800 text-white hover:bg-slate-700"
+    }`}
+  >
+    Visitante
+  </button>
+
+  <button
+    onClick={() => setActiveTab("resultado")}
+    className={`rounded-xl px-4 py-2 font-semibold ${
+      activeTab === "resultado"
+        ? "bg-cyan-400 text-slate-950"
+        : "bg-slate-800 text-white hover:bg-slate-700"
+    }`}
+  >
+    Resultado
+  </button>
+
+  <button
+    onClick={() => setActiveTab("historial")}
+    className={`rounded-xl px-4 py-2 font-semibold ${
+      activeTab === "historial"
+        ? "bg-cyan-400 text-slate-950"
+        : "bg-slate-800 text-white hover:bg-slate-700"
+    }`}
+  >
+    Historial
+  </button>
+</div>
+
+       <div
+  className={
+    activeTab === "info"
+      ? "mb-6 rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-4"
+      : "hidden"
+  }
+>
   <h2 className="mb-4 text-xl font-semibold text-cyan-300">
     Información del partido
   </h2>
@@ -647,7 +712,7 @@ function deleteSavedAnalysis(id: string) {
   </div>
 </div>
         <div className="grid gap-6 lg:grid-cols-2">
-          <section className={card}>
+         <section className={activeTab === "local" ? card : "hidden"}>
             <h2 className={sectionTitle}>1. Equipo local</h2>
 
             <div className="mb-4 text-sm font-semibold text-cyan-200">General</div>
@@ -729,7 +794,7 @@ function deleteSavedAnalysis(id: string) {
             </div>
           </section>
 
-          <section className={card}>
+          <section className={activeTab === "visitante" ? card : "hidden"}>
             <h2 className={sectionTitle}>2. Equipo visitante</h2>
 
             <div className="mb-4 text-sm font-semibold text-cyan-200">General</div>
@@ -812,7 +877,13 @@ function deleteSavedAnalysis(id: string) {
           </section>
         </div>
 
-        <div className="mt-6 rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-4">
+       <div
+  className={
+    activeTab === "resultado"
+      ? "mt-6 rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-4"
+      : "hidden"
+  }
+>
           <div className="flex flex-wrap gap-3">
             <button
               onClick={handleAnalyze}
@@ -842,7 +913,7 @@ function deleteSavedAnalysis(id: string) {
           )}
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <div className={activeTab === "resultado" ? "mt-6 grid gap-6 lg:grid-cols-2" : "hidden"}>
           <section className={card}>
             <h2 className={sectionTitle}>3. Resultado probable</h2>
 
@@ -963,7 +1034,13 @@ function deleteSavedAnalysis(id: string) {
             )}
           </section>
         </div>
-       <div className="mt-6 rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-4">
+       <div
+  className={
+    activeTab === "historial"
+      ? "mt-6 rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-4"
+      : "hidden"
+  }
+>
   <h2 className="mb-4 text-xl font-semibold text-cyan-300">
     5. Historial y control de aciertos
   </h2>
