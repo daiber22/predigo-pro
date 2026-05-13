@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type TeamForm = {
   pjGeneral: string;
@@ -17,6 +17,41 @@ type TeamForm = {
   rpContraSplit: string;
   rbFavorSplit: string;
   rbContraSplit: string;
+};
+type MatchInfo = {
+  league: string;
+  date: string;
+  homeName: string;
+  awayName: string;
+};
+
+type SavedAnalysis = {
+  id: string;
+  createdAt: string;
+  matchInfo: MatchInfo;
+  input: {
+    local: TeamForm;
+    visitante: TeamForm;
+  };
+  prediction: {
+    predictedScore: string;
+    lambdaLocal: number;
+    lambdaVisitante: number;
+    probabilities: {
+      local: number;
+      empate: number;
+      visitante: number;
+      over25: number;
+      under25: number;
+      btts: number;
+      noBtts: number;
+    };
+    reading: string;
+  };
+  actual?: {
+    homeGoals: number;
+    awayGoals: number;
+  };
 };
 
 function toNumber(value: string) {
@@ -133,6 +168,102 @@ function ReadingPanel({ result }: { result: any }) {
   );
 }
 
+function getPredictedOutcome(probabilities: SavedAnalysis["prediction"]["probabilities"]) {
+  const values = [
+    { key: "local", value: probabilities.local },
+    { key: "empate", value: probabilities.empate },
+    { key: "visitante", value: probabilities.visitante },
+  ];
+
+  return values.sort((a, b) => b.value - a.value)[0].key;
+}
+
+function getActualOutcome(homeGoals: number, awayGoals: number) {
+  if (homeGoals > awayGoals) return "local";
+  if (homeGoals === awayGoals) return "empate";
+  return "visitante";
+}
+
+function parsePredictedScore(score: string) {
+  const [home, away] = score.split("-").map((x) => Number(x));
+
+  return {
+    home: Number.isFinite(home) ? home : 0,
+    away: Number.isFinite(away) ? away : 0,
+  };
+}
+
+function evaluateAnalysis(item: SavedAnalysis) {
+  if (!item.actual) return null;
+
+  const actualHome = item.actual.homeGoals;
+  const actualAway = item.actual.awayGoals;
+
+  const predictedScore = parsePredictedScore(item.prediction.predictedScore);
+
+  const predictedOutcome = getPredictedOutcome(item.prediction.probabilities);
+  const actualOutcome = getActualOutcome(actualHome, actualAway);
+
+  const predictedOver25 =
+    item.prediction.probabilities.over25 >= item.prediction.probabilities.under25;
+  const actualOver25 = actualHome + actualAway >= 3;
+
+  const predictedBTTS =
+    item.prediction.probabilities.btts >= item.prediction.probabilities.noBtts;
+  const actualBTTS = actualHome >= 1 && actualAway >= 1;
+
+  return {
+    exactScoreHit:
+      predictedScore.home === actualHome && predictedScore.away === actualAway,
+    outcomeHit: predictedOutcome === actualOutcome,
+    over25Hit: predictedOver25 === actualOver25,
+    bttsHit: predictedBTTS === actualBTTS,
+    predictedOutcome,
+    actualOutcome,
+    predictedOver25,
+    actualOver25,
+    predictedBTTS,
+    actualBTTS,
+  };
+}
+
+function buildAccuracySummary(items: SavedAnalysis[]) {
+  const finished = items.filter((item) => item.actual);
+  const total = finished.length;
+
+  if (total === 0) {
+    return {
+      total: 0,
+      exactScore: 0,
+      outcome: 0,
+      over25: 0,
+      btts: 0,
+    };
+  }
+
+  let exactScore = 0;
+  let outcome = 0;
+  let over25 = 0;
+  let btts = 0;
+
+  for (const item of finished) {
+    const evaluation = evaluateAnalysis(item);
+    if (!evaluation) continue;
+
+    if (evaluation.exactScoreHit) exactScore += 1;
+    if (evaluation.outcomeHit) outcome += 1;
+    if (evaluation.over25Hit) over25 += 1;
+    if (evaluation.bttsHit) btts += 1;
+  }
+
+  return {
+    total,
+    exactScore,
+    outcome,
+    over25,
+    btts,
+  };
+}
 function buildInitialTeam(): TeamForm {
   return {
     pjGeneral: "",
@@ -323,6 +454,34 @@ export default function Page() {
   const [visitante, setVisitante] = useState<TeamForm>(buildInitialTeam());
   const [result, setResult] = useState<any>(null);
   const [message, setMessage] = useState("");
+  const [matchInfo, setMatchInfo] = useState<MatchInfo>({
+  league: "",
+  date: "",
+  homeName: "",
+  awayName: "",
+});
+
+const [savedAnalyses, setSavedAnalyses] = useState<SavedAnalysis[]>([]);
+  useEffect(() => {
+  const raw = window.localStorage.getItem("predigo_saved_analyses_v1");
+  if (!raw) return;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      setSavedAnalyses(parsed);
+    }
+  } catch {
+    setSavedAnalyses([]);
+  }
+}, []);
+
+useEffect(() => {
+  window.localStorage.setItem(
+    "predigo_saved_analyses_v1",
+    JSON.stringify(savedAnalyses)
+  );
+}, [savedAnalyses]);
 
   function updateLocal(key: keyof TeamForm, value: string) {
     setLocal((prev) => ({ ...prev, [key]: value }));
@@ -351,12 +510,81 @@ export default function Page() {
     setMessage("Análisis calculado correctamente.");
   }
 
-  function handleClear() {
-    setLocal(buildInitialTeam());
-    setVisitante(buildInitialTeam());
-    setResult(null);
-    setMessage("");
+ function handleClear() {
+  setLocal(buildInitialTeam());
+  setVisitante(buildInitialTeam());
+  setResult(null);
+  setMessage("");
+}
+
+function updateMatchInfo(key: keyof MatchInfo, value: string) {
+  setMatchInfo((prev) => ({ ...prev, [key]: value }));
+}
+
+function saveCurrentAnalysis() {
+  if (!result) {
+    setMessage("Primero calcula un análisis antes de guardar.");
+    return;
   }
+
+  const reading = buildReading(result);
+
+  const item: SavedAnalysis = {
+    id: `${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    matchInfo: {
+      league: matchInfo.league || "Sin liga",
+      date: matchInfo.date || "",
+      homeName: matchInfo.homeName || "Local",
+      awayName: matchInfo.awayName || "Visitante",
+    },
+    input: {
+      local,
+      visitante,
+    },
+    prediction: {
+      predictedScore: result.predictedScore,
+      lambdaLocal: result.lambdaLocal,
+      lambdaVisitante: result.lambdaVisitante,
+      probabilities: result.probabilities,
+      reading: reading.main,
+    },
+  };
+
+  setSavedAnalyses((prev) => [item, ...prev]);
+  setMessage("Análisis guardado correctamente.");
+}
+
+function updateActualResult(
+  id: string,
+  side: "homeGoals" | "awayGoals",
+  value: string
+) {
+  const numericValue = Number(value);
+
+  setSavedAnalyses((prev) =>
+    prev.map((item) => {
+      if (item.id !== id) return item;
+
+      const currentActual = item.actual || {
+        homeGoals: 0,
+        awayGoals: 0,
+      };
+
+      return {
+        ...item,
+        actual: {
+          ...currentActual,
+          [side]: Number.isFinite(numericValue) ? numericValue : 0,
+        },
+      };
+    })
+  );
+}
+
+function deleteSavedAnalysis(id: string) {
+  setSavedAnalyses((prev) => prev.filter((item) => item.id !== id));
+}
 
   const card =
     "rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-4 shadow-lg shadow-cyan-900/10";
@@ -374,6 +602,50 @@ export default function Page() {
           componente de remates.
         </p>
 
+        <div className="mb-6 rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-4">
+  <h2 className="mb-4 text-xl font-semibold text-cyan-300">
+    Información del partido
+  </h2>
+
+  <div className="grid gap-4 md:grid-cols-4">
+    <div>
+      <label className="mb-1 block text-sm text-cyan-300">Liga</label>
+      <input
+        value={matchInfo.league}
+        onChange={(e) => updateMatchInfo("league", e.target.value)}
+        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-cyan-400"
+      />
+    </div>
+
+    <div>
+      <label className="mb-1 block text-sm text-cyan-300">Fecha</label>
+      <input
+        type="date"
+        value={matchInfo.date}
+        onChange={(e) => updateMatchInfo("date", e.target.value)}
+        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-cyan-400"
+      />
+    </div>
+
+    <div>
+      <label className="mb-1 block text-sm text-cyan-300">Equipo local</label>
+      <input
+        value={matchInfo.homeName}
+        onChange={(e) => updateMatchInfo("homeName", e.target.value)}
+        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-cyan-400"
+      />
+    </div>
+
+    <div>
+      <label className="mb-1 block text-sm text-cyan-300">Equipo visitante</label>
+      <input
+        value={matchInfo.awayName}
+        onChange={(e) => updateMatchInfo("awayName", e.target.value)}
+        className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-white outline-none focus:border-cyan-400"
+      />
+    </div>
+  </div>
+</div>
         <div className="grid gap-6 lg:grid-cols-2">
           <section className={card}>
             <h2 className={sectionTitle}>1. Equipo local</h2>
@@ -555,6 +827,12 @@ export default function Page() {
             >
               Limpiar
             </button>
+            <button
+  onClick={saveCurrentAnalysis}
+  className="rounded-xl bg-emerald-500 px-4 py-2 font-semibold text-slate-950 hover:bg-emerald-400"
+>
+  Guardar análisis
+</button>
           </div>
 
           {message && (
@@ -685,6 +963,181 @@ export default function Page() {
             )}
           </section>
         </div>
+       <div className="mt-6 rounded-2xl border border-cyan-500/20 bg-slate-900/70 p-4">
+  <h2 className="mb-4 text-xl font-semibold text-cyan-300">
+    5. Historial y control de aciertos
+  </h2>
+
+  {(() => {
+    const summary = buildAccuracySummary(savedAnalyses);
+
+    return (
+      <div className="mb-4 grid gap-3 md:grid-cols-5">
+        <div className="rounded-xl border border-slate-700 bg-slate-950 p-3">
+          <div className="text-sm text-slate-400">Partidos cerrados</div>
+          <div className="text-2xl font-bold text-cyan-300">{summary.total}</div>
+        </div>
+
+        <div className="rounded-xl border border-slate-700 bg-slate-950 p-3">
+          <div className="text-sm text-slate-400">Marcador exacto</div>
+          <div className="text-2xl font-bold text-cyan-300">
+            {summary.total ? pct(summary.exactScore / summary.total) : "0.0%"}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-700 bg-slate-950 p-3">
+          <div className="text-sm text-slate-400">Ganador 1X2</div>
+          <div className="text-2xl font-bold text-cyan-300">
+            {summary.total ? pct(summary.outcome / summary.total) : "0.0%"}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-700 bg-slate-950 p-3">
+          <div className="text-sm text-slate-400">Over/Under 2.5</div>
+          <div className="text-2xl font-bold text-cyan-300">
+            {summary.total ? pct(summary.over25 / summary.total) : "0.0%"}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-700 bg-slate-950 p-3">
+          <div className="text-sm text-slate-400">Ambos marcan</div>
+          <div className="text-2xl font-bold text-cyan-300">
+            {summary.total ? pct(summary.btts / summary.total) : "0.0%"}
+          </div>
+        </div>
+      </div>
+    );
+  })()}
+
+  {savedAnalyses.length === 0 && (
+    <div className="rounded-xl border border-slate-700 bg-slate-950 p-4 text-slate-300">
+      Todavía no hay análisis guardados.
+    </div>
+  )}
+
+  <div className="space-y-4">
+    {savedAnalyses.map((item) => {
+      const evaluation = evaluateAnalysis(item);
+
+      return (
+        <div
+          key={item.id}
+          className="rounded-xl border border-slate-700 bg-slate-950 p-4"
+        >
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-lg font-bold text-white">
+                {item.matchInfo.homeName} vs {item.matchInfo.awayName}
+              </div>
+              <div className="text-sm text-slate-400">
+                {item.matchInfo.league} {item.matchInfo.date ? `• ${item.matchInfo.date}` : ""}
+              </div>
+            </div>
+
+            <button
+              onClick={() => deleteSavedAnalysis(item.id)}
+              className="rounded-lg bg-red-500/20 px-3 py-1 text-sm text-red-300 hover:bg-red-500/30"
+            >
+              Borrar
+            </button>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-4">
+            <div>
+              <div className="text-sm text-slate-400">Marcador previsto</div>
+              <div className="text-xl font-bold text-cyan-300">
+                {item.prediction.predictedScore}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-sm text-slate-400">Lectura</div>
+              <div className="font-semibold text-white">
+                {item.prediction.reading}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-sm text-slate-400">Lambda local</div>
+              <div className="font-semibold text-white">
+                {item.prediction.lambdaLocal.toFixed(2)}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-sm text-slate-400">Lambda visitante</div>
+              <div className="font-semibold text-white">
+                {item.prediction.lambdaVisitante.toFixed(2)}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm text-cyan-300">
+                Goles reales local
+              </label>
+              <input
+                type="number"
+                value={item.actual?.homeGoals ?? ""}
+                onChange={(e) =>
+                  updateActualResult(item.id, "homeGoals", e.target.value)
+                }
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white outline-none focus:border-cyan-400"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm text-cyan-300">
+                Goles reales visitante
+              </label>
+              <input
+                type="number"
+                value={item.actual?.awayGoals ?? ""}
+                onChange={(e) =>
+                  updateActualResult(item.id, "awayGoals", e.target.value)
+                }
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white outline-none focus:border-cyan-400"
+              />
+            </div>
+          </div>
+
+          {evaluation && (
+            <div className="mt-4 grid gap-2 text-sm md:grid-cols-4">
+              <div>
+                Marcador exacto:{" "}
+                <strong className={evaluation.exactScoreHit ? "text-emerald-300" : "text-red-300"}>
+                  {evaluation.exactScoreHit ? "Acierto" : "Fallo"}
+                </strong>
+              </div>
+
+              <div>
+                1X2:{" "}
+                <strong className={evaluation.outcomeHit ? "text-emerald-300" : "text-red-300"}>
+                  {evaluation.outcomeHit ? "Acierto" : "Fallo"}
+                </strong>
+              </div>
+
+              <div>
+                Over/Under:{" "}
+                <strong className={evaluation.over25Hit ? "text-emerald-300" : "text-red-300"}>
+                  {evaluation.over25Hit ? "Acierto" : "Fallo"}
+                </strong>
+              </div>
+
+              <div>
+                Ambos marcan:{" "}
+                <strong className={evaluation.bttsHit ? "text-emerald-300" : "text-red-300"}>
+                  {evaluation.bttsHit ? "Acierto" : "Fallo"}
+                </strong>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    })}
+  </div>
+</div>
       </div>
     </main>
   );
