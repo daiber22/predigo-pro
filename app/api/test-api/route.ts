@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   return NextResponse.json({
     ok: true,
-    mensaje: "test-api funcionando",
+    message: "test-api funcionando",
+    total: 1,
   });
 }
