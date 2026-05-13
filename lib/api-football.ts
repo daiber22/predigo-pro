@@ -276,9 +276,13 @@ const preferredLeagueId =
       fetchApiFootball(`/teams/statistics?league=${resolvedLeagueId}&season=${season}&team=${home.id}`),
       fetchApiFootball(`/teams/statistics?league=${resolvedLeagueId}&season=${season}&team=${away.id}`),
     ]);
-
-    const homeResp = homeStats.response;
-    const awayResp = awayStats.response;
+const homeResp = Array.isArray(homeStats?.response)
+  ? homeStats.response[0]
+  : homeStats?.response || homeStats;
+   
+    const awayResp = Array.isArray(awayStats?.response)
+  ? awayStats.response[0]
+  : awayStats?.response || awayStats;
 
     const homeForGeneral = Number(homeResp?.goals?.for?.total?.total ?? 0);
     const homeAgainstGeneral = Number(homeResp?.goals?.against?.total?.total ?? 0);
