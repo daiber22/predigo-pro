@@ -694,7 +694,7 @@ function deleteSavedAnalysis(id: string) {
     </div>
   </div>
 </div>
-        <div className={activeTab === "info" ? "grid gap-6 lg:grid-cols-2" : "hidden"}>
+      <div className={activeTab === "info" ? "grid grid-cols-2 gap-4 items-start" : "hidden"}>
          <section className={card}>
             <h2 className={sectionTitle}>1. Equipo local</h2>
 
