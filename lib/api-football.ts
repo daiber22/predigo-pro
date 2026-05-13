@@ -104,13 +104,50 @@ function scoreCountry(expected?: string, actual?: string) {
 }
 
 function selectTeamCandidate(candidates: ApiFootballTeamCandidate[], teamName: string, country?: string) {
+  const normalize = (value?: string) =>
+    String(value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\b(fc|cf|cd|sc|ac)\b/g, ' ')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const wanted = normalize(teamName);
+
+  const aliasMap: Record<string, string[]> = {
+    junior: ['junior', 'junior fc', 'atletico junior', 'junior barranquilla'],
+    'once caldas': ['once caldas', 'once caldas manizales'],
+    'santa fe': ['santa fe', 'independiente santa fe'],
+    'america de cali': ['america de cali', 'america cali'],
+    america: ['america de cali', 'america cali'],
+  };
+
+  const wantedVariants = new Set([
+    wanted,
+    ...(aliasMap[wanted] || []).map((item) => normalize(item)),
+  ]);
+
   return safeArray(candidates)
-    .map((candidate) => ({
-      candidate,
-      score:
-        scoreName(teamName, candidate.team?.name || '') +
-        scoreCountry(country, candidate.team?.country),
-    }))
+    .map((candidate) => {
+      const candidateName = normalize(candidate.team?.name);
+      const exact = wantedVariants.has(candidateName) ? 100 : 0;
+      const partial = Array.from(wantedVariants).some(
+        (item) => item && (candidateName.includes(item) || item.includes(candidateName)),
+      )
+        ? 40
+        : 0;
+
+      return {
+        candidate,
+        score:
+          exact +
+          partial +
+          scoreName(teamName, candidate.team?.name || '') +
+          scoreCountry(country, candidate.team?.country),
+      };
+    })
     .sort((a, b) => b.score - a.score)[0]?.candidate;
 }
 
