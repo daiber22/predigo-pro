@@ -1,429 +1,352 @@
-import { buildMockFixture } from '@/lib/mock-data';
-import { getLeagueOption } from '@/lib/league-options';
-import { allowDemoFallback } from '@/lib/env';
-import { FixtureMatch, TeamSearchInput } from '@/lib/types';
+// lib/api-football.ts
 
-const API_BASE = process.env.API_FOOTBALL_BASE_URL || 'https://v3.football.api-sports.io';
-const API_KEY = process.env.API_FOOTBALL_KEY;
-const DEMO_FALLBACK = allowDemoFallback();
+export const API_KEY = process.env.API_FOOTBALL_KEY || "";
+export const BASE_URL =
+  process.env.API_FOOTBALL_BASE_URL || "https://v3.football.api-sports.io";
 
-type ApiFootballTeamCandidate = {
-  team?: {
-    id?: number;
-    name?: string;
-    country?: string;
-  };
-};
-
-type ApiFootballLeagueCandidate = {
-  league?: {
-    id?: number;
-    name?: string;
-  };
-  country?: {
-    name?: string;
-  };
-  seasons?: Array<{
-    year?: number;
-    current?: boolean;
-  }>;
-};
-
-type ApiFootballFixture = {
-  fixture?: {
-    id?: number;
-    date?: string;
-    status?: {
-      short?: string;
-    };
-  };
-  league?: {
-    id?: number;
-    name?: string;
-    country?: string;
-    round?: string;
-  };
-  teams?: {
-    home?: {
-      id?: number;
-      name?: string;
-    };
-    away?: {
-      id?: number;
-      name?: string;
-    };
-  };
-};
-
-async function fetchApiFootball(path: string) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      'x-apisports-key': API_KEY || '',
-    },
-    cache: 'no-store',
-  });
-
-  if (!response.ok) {
-    throw new Error(`API-Football respondió ${response.status}`);
-  }
-
-  return response.json();
-}
-
-function normalizeText(value?: string) {
-  return (value || '')
+export function norm(value: string) {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, " ")
     .trim();
 }
 
-function safeArray<T>(value: T[] | undefined | null): T[] {
-  return Array.isArray(value) ? value : [];
+export const TEAM_ALIASES: Record<string, string> = {
+  junior: "Junior FC",
+  "junior fc": "Junior FC",
+  "once caldas": "Once Caldas",
+  pasto: "Deportivo Pasto",
+  "deportivo pasto": "Deportivo Pasto",
+  tolima: "Deportes Tolima",
+  "deportes tolima": "Deportes Tolima",
+  "atletico nacional": "Atletico Nacional",
+  nacional: "Atletico Nacional",
+  "america de cali": "America de Cali",
+  america: "America de Cali",
+  "independiente santa fe": "Santa Fe",
+  "santa fe": "Santa Fe",
+  millonarios: "Millonarios",
+};
+
+export function canonicalTeamName(name: string) {
+  const key = norm(name);
+  return TEAM_ALIASES[key] || name;
 }
 
-function scoreName(query: string, candidate: string) {
-  const q = normalizeText(query);
-  const c = normalizeText(candidate);
-
-  if (!q || !c) return 0;
-  if (q === c) return 120;
-  if (c.startsWith(q) || q.startsWith(c)) return 90;
-  if (c.includes(q) || q.includes(c)) return 70;
-
-  const queryTokens = q.split(' ');
-  const candidateTokens = c.split(' ');
-  const shared = queryTokens.filter((token) => candidateTokens.includes(token)).length;
-  return shared * 15;
-}
-
-function scoreCountry(expected?: string, actual?: string) {
-  if (!expected || !actual) return 0;
-  return normalizeText(expected) === normalizeText(actual) ? 35 : 0;
-}
-
-function selectTeamCandidate(candidates: ApiFootballTeamCandidate[], teamName: string, country?: string) {
-  const normalize = (value?: string) =>
-    String(value || '')
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/\b(fc|cf|cd|sc|ac)\b/g, ' ')
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-  const wanted = normalize(teamName);
-
-  const aliasMap: Record<string, string[]> = {
-    junior: ['junior', 'junior fc', 'atletico junior', 'junior barranquilla'],
-    'once caldas': ['once caldas', 'once caldas manizales'],
-    'santa fe': ['santa fe', 'independiente santa fe'],
-    'america de cali': ['america de cali', 'america cali'],
-    america: ['america de cali', 'america cali'],
-  };
-
-  const wantedVariants = new Set([
-    wanted,
-    ...(aliasMap[wanted] || []).map((item) => normalize(item)),
-  ]);
-
-  return safeArray(candidates)
-    .map((candidate) => {
-      const candidateName = normalize(candidate.team?.name);
-      const exact = wantedVariants.has(candidateName) ? 100 : 0;
-      const partial = Array.from(wantedVariants).some(
-        (item) => item && (candidateName.includes(item) || item.includes(candidateName)),
-      )
-        ? 40
-        : 0;
-
-      return {
-        candidate,
-        score:
-          exact +
-          partial +
-          scoreName(teamName, candidate.team?.name || '') +
-          scoreCountry(country, candidate.team?.country),
-      };
-    })
-    .sort((a, b) => b.score - a.score)[0]?.candidate;
-}
-
-function selectLeagueCandidate(candidates: ApiFootballLeagueCandidate[], league?: string, country?: string, season?: number) {
-  return safeArray(candidates)
-    .map((candidate) => ({
-      candidate,
-      score:
-        scoreName(league || '', candidate.league?.name || '') +
-        scoreCountry(country, candidate.country?.name) +
-        (candidate.seasons?.some((item) => item.year === season && item.current) ? 10 : 0),
-    }))
-    .sort((a, b) => b.score - a.score)[0]?.candidate;
-}
-
-function isScheduledStatus(status?: string) {
-  return ['TBD', 'NS', 'PST'].includes(status || '');
-}
-
-function dateDistanceScore(targetDate: string | undefined, candidateDate: string | undefined) {
-  if (!targetDate || !candidateDate) return 0;
-
-  const target = new Date(targetDate).getTime();
-  const candidate = new Date(candidateDate).getTime();
-  if (Number.isNaN(target) || Number.isNaN(candidate)) return 0;
-
-  const diffDays = Math.abs(target - candidate) / (1000 * 60 * 60 * 24);
-  if (diffDays < 0.5) return 60;
-  if (diffDays < 1.5) return 45;
-  if (diffDays < 3) return 25;
-  if (diffDays < 7) return 10;
-  return 0;
-}
-
-function chooseFixture(fixtures: ApiFootballFixture[], awayTeamId?: number, input?: TeamSearchInput, leagueId?: number) {
-  return safeArray(fixtures)
-    .map((fixture) => {
-      const awayMatch = fixture.teams?.away?.id === awayTeamId ? 120 : 0;
-      const homeMatch = normalizeText(fixture.teams?.home?.name) === normalizeText(input?.homeTeam) ? 40 : 0;
-      const leagueMatch = leagueId && fixture.league?.id === leagueId ? 30 : 0;
-      const statusScore = isScheduledStatus(fixture.fixture?.status?.short) ? 20 : 10;
-      const kickoffScore = dateDistanceScore(input?.matchDate, fixture.fixture?.date);
-
-      return {
-        fixture,
-        score: awayMatch + homeMatch + leagueMatch + statusScore + kickoffScore,
-      };
-    })
-    .sort((a, b) => b.score - a.score)[0]?.fixture;
-}
-
-async function findTeam(teamName: string, country?: string) {
-  const normalizedName = teamName
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\b(fc|cf|cd|sc|ac)\b/g, ' ')
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  const aliasMap: Record<string, string[]> = {
-    junior: ['Junior', 'Junior FC', 'Atletico Junior'],
-    'once caldas': ['Once Caldas', 'Once Caldas Manizales'],
-    'santa fe': ['Santa Fe', 'Independiente Santa Fe'],
-    'america de cali': ['America de Cali', 'América de Cali'],
-    america: ['America de Cali', 'América de Cali'],
-  };
-
-  const searchTerms = Array.from(
-    new Set(
-      [
-        teamName,
-        teamName.normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
-        ...(aliasMap[normalizedName] || []),
-      ]
-        .map((item) => item.trim())
-        .filter(Boolean),
-    ),
-  );
-
-  for (const searchTerm of searchTerms) {
-    const response = await fetchApiFootball(`/teams?search=${encodeURIComponent(searchTerm)}`);
-    const candidate =
-      selectTeamCandidate(response.response, teamName, country)?.team ||
-      selectTeamCandidate(response.response, searchTerm, country)?.team;
-
-    if (candidate?.id) {
-      return candidate;
-    }
-  }
-
-  return undefined;
-}
-
-async function findLeague(input: TeamSearchInput, season: number) {
-  if (!input.league) return undefined;
-
-  const params = new URLSearchParams({
-    search: input.league,
-    season: String(season),
-  });
-
-  if (input.country) {
-    params.set('country', input.country);
-  }
-
-  const response = await fetchApiFootball(`/leagues?${params.toString()}`);
-  return selectLeagueCandidate(response.response, input.league, input.country, season)?.league;
-}
-
-async function findFixture(homeTeamId: number, awayTeamId: number, season: number, leagueId: number | undefined, input: TeamSearchInput) {
-  const queryBase = new URLSearchParams({
-    season: String(season),
-  });
-
-  if (leagueId) {
-    queryBase.set('league', String(leagueId));
-  }
-
-  const candidateGroups: ApiFootballFixture[][] = [];
-
-  try {
-    const headToHead = await fetchApiFootball(
-      `/fixtures/headtohead?h2h=${homeTeamId}-${awayTeamId}&${queryBase.toString()}`,
-    );
-    candidateGroups.push(safeArray(headToHead.response));
-  } catch {
-    // Se ignora y se usan fallbacks.
-  }
-
-  try {
-    const nextFixtures = await fetchApiFootball(
-      `/fixtures?team=${homeTeamId}&next=20&${queryBase.toString()}`,
-    );
-    candidateGroups.push(safeArray(nextFixtures.response));
-  } catch {
-    // sin-op
-  }
-
-  try {
-    const lastFixtures = await fetchApiFootball(
-      `/fixtures?team=${homeTeamId}&last=20&${queryBase.toString()}`,
-    );
-    candidateGroups.push(safeArray(lastFixtures.response));
-  } catch {
-    // sin-op
-  }
-
-  const candidates = candidateGroups.flat();
-  return chooseFixture(candidates, awayTeamId, input, leagueId);
-}
-
-function scaleToLast5(goals: number, matches: number) {
-  if (!matches) return 0;
-  return Number(((goals / matches) * 5).toFixed(2));
-}
-
-export async function searchFixtureWithStats(input: TeamSearchInput): Promise<FixtureMatch> {
-  const leagueOption = getLeagueOption(input.leagueKey);
-  const resolvedInput: TeamSearchInput = {
-    ...input,
-    league: input.league || leagueOption?.league,
-    country: input.country || leagueOption?.country,
-    season: input.season || leagueOption?.defaultSeason || Number(process.env.DEFAULT_SEASON || 2026),
-  };
-
+export async function apiFootball(
+  path: string,
+  params: Record<string, string> = {}
+) {
   if (!API_KEY) {
-    if (DEMO_FALLBACK) {
-      return buildMockFixture(resolvedInput);
-    }
-    throw new Error('Falta API_FOOTBALL_KEY. La app quedó configurada para usar API real primero.');
+    throw new Error("Falta API_FOOTBALL_KEY en variables de entorno");
   }
+
+  const url = new URL(`${BASE_URL}${path}`);
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (`${value}`.trim() !== "") {
+      url.searchParams.set(key, value);
+    }
+  });
+
+  const res = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      "x-apisports-key": API_KEY,
+    },
+    cache: "no-store",
+  });
+
+  const text = await res.text();
+  let json: any = null;
 
   try {
-    const season = resolvedInput.season || Number(process.env.DEFAULT_SEASON || 2026);
-    const [home, away, league] = await Promise.all([
-      findTeam(resolvedInput.homeTeam, resolvedInput.country),
-      findTeam(resolvedInput.awayTeam, resolvedInput.country),
-      findLeague(resolvedInput, season),
-    ]);
+    json = text ? JSON.parse(text) : {};
+  } catch {
+    json = { raw: text };
+  }
 
-    if (!home?.id || !away?.id || !home.name || !away.name) {
-      if (DEMO_FALLBACK) {
-        return buildMockFixture(resolvedInput);
-      }
-      throw new Error('No pude resolver los dos equipos en API-Football. Revisa nombres, liga o país.');
-    }
-const preferredLeagueId =
-  resolvedInput.leagueKey === 'colombia-primera-a' ? 239 : league?.id;
- const fixture = await findFixture(home.id, away.id, season, preferredLeagueId, resolvedInput);
-    const resolvedLeagueId = fixture?.league?.id || preferredLeagueId;
+  if (!res.ok) {
+    throw new Error(
+      `API-Football ${res.status}: ${
+        json?.message || json?.errors || text || "Error sin detalle"
+      }`
+    );
+  }
 
-    if (!resolvedLeagueId) {
-      if (DEMO_FALLBACK) {
-        return buildMockFixture(resolvedInput);
-      }
-      throw new Error('No pude resolver la liga o fixture real para ese cruce.');
-    }
+  if (json?.errors && Object.keys(json.errors).length > 0) {
+    throw new Error(`API-Football error: ${JSON.stringify(json.errors)}`);
+  }
 
-    const [homeStats, awayStats] = await Promise.all([
-      fetchApiFootball(`/teams/statistics?league=${resolvedLeagueId}&season=${season}&team=${home.id}`),
-      fetchApiFootball(`/teams/statistics?league=${resolvedLeagueId}&season=${season}&team=${away.id}`),
-    ]);
-const homeResp = Array.isArray(homeStats?.response)
-  ? homeStats.response[0]
-  : homeStats?.response || homeStats;
-   
-    const awayResp = Array.isArray(awayStats?.response)
-  ? awayStats.response[0]
-  : awayStats?.response || awayStats;
-const homeCount = Array.isArray(homeStats?.response)
-  ? homeStats.response.length
-  : homeStats?.response ? 1 : 0;
+  return json;
+}
 
-const awayCount = Array.isArray(awayStats?.response)
-  ? awayStats.response.length
-  : awayStats?.response ? 1 : 0;
+export async function resolveLeagueId(
+  league: string,
+  country: string,
+  season: string
+) {
+  const data = await apiFootball("/leagues", {
+    search: league,
+    country,
+    season,
+  });
 
-if (!homeResp || !awayResp) {
+  const list = data?.response || [];
+  const targetLeague = norm(league);
+  const targetCountry = norm(country);
+
+  const exact = list.find(
+    (x: any) =>
+      norm(x?.league?.name || "") === targetLeague &&
+      norm(x?.country?.name || "") === targetCountry
+  );
+
+  if (exact) {
+    return exact.league.id;
+  }
+
+  const countryMatch = list.find(
+    (x: any) => norm(x?.country?.name || "") === targetCountry
+  );
+
+  if (countryMatch) {
+    return countryMatch.league.id;
+  }
+
   throw new Error(
-    `Stats vacias API-Football | league=${resolvedLeagueId} season=${season} homeTeam=${home?.id} awayTeam=${away?.id} homeCount=${homeCount} awayCount=${awayCount}`
+    `No encontré la liga "${league}" en país "${country}" para temporada ${season}`
   );
 }
-    const homeForGeneral = Number(homeResp?.goals?.for?.total?.total ?? 0);
-    const homeAgainstGeneral = Number(homeResp?.goals?.against?.total?.total ?? 0);
-    const homeMatchesGeneral = Number(homeResp?.fixtures?.played?.total ?? 1);
-    const homeForHome = Number(homeResp?.goals?.for?.total?.home ?? 0);
-    const homeAgainstHome = Number(homeResp?.goals?.against?.total?.home ?? 0);
-    const homeMatchesHome = Number(homeResp?.fixtures?.played?.home ?? 1);
 
-    const awayForGeneral = Number(awayResp?.goals?.for?.total?.total ?? 0);
-    const awayAgainstGeneral = Number(awayResp?.goals?.against?.total?.total ?? 0);
-    const awayMatchesGeneral = Number(awayResp?.fixtures?.played?.total ?? 1);
-    const awayForAway = Number(awayResp?.goals?.for?.total?.away ?? 0);
-    const awayAgainstAway = Number(awayResp?.goals?.against?.total?.away ?? 0);
-    const awayMatchesAway = Number(awayResp?.fixtures?.played?.away ?? 1);
+export async function resolveTeamId(
+  teamName: string,
+  leagueId: string,
+  season: string
+) {
+  const canonical = canonicalTeamName(teamName);
 
-    return {
-      fixtureId: String(fixture?.fixture?.id || `${home.id}-${away.id}-${season}`),
-      leagueKey: resolvedInput.leagueKey,
-      oddsSportKey: leagueOption?.oddsSportKey || process.env.ODDS_API_SPORT_KEY || undefined,
-      homeTeamId: home.id,
-      awayTeamId: away.id,
-      leagueId: resolvedLeagueId,
-      leagueName: fixture?.league?.name || league?.name || resolvedInput.league || process.env.DEFAULT_LEAGUE || 'Liga detectada',
-      country: fixture?.league?.country || resolvedInput.country,
-      season,
-      round: fixture?.league?.round,
-      matchDate: fixture?.fixture?.date || resolvedInput.matchDate,
-      source: 'api-football',
-      stats: {
-        homeTeam: home.name,
-        awayTeam: away.name,
-        homeGoalsForGeneral: scaleToLast5(homeForGeneral, homeMatchesGeneral),
-        homeGoalsAgainstGeneral: scaleToLast5(homeAgainstGeneral, homeMatchesGeneral),
-        homeGoalsForHome: scaleToLast5(homeForHome, homeMatchesHome),
-        homeGoalsAgainstHome: scaleToLast5(homeAgainstHome, homeMatchesHome),
-        awayGoalsForGeneral: scaleToLast5(awayForGeneral, awayMatchesGeneral),
-        awayGoalsAgainstGeneral: scaleToLast5(awayAgainstGeneral, awayMatchesGeneral),
-        awayGoalsForAway: scaleToLast5(awayForAway, awayMatchesAway),
-        awayGoalsAgainstAway: scaleToLast5(awayAgainstAway, awayMatchesAway),
-        homeShotsOnTargetGeneral: 0,
-homeBlockedShotsGeneral: 0,
-homeShotsOnTargetHome: 0,
-homeBlockedShotsHome: 0,
-awayShotsOnTargetGeneral: 0,
-awayBlockedShotsGeneral: 0,
-awayShotsOnTargetAway: 0,
-awayBlockedShotsAway: 0,
-      },
-    };
-  } catch (error) {
-    if (DEMO_FALLBACK) {
-      return buildMockFixture(resolvedInput);
-    }
-    throw error instanceof Error ? error : new Error('No se pudo consultar API-Football.');
+  const scoped = await apiFootball("/teams", {
+    search: canonical,
+    league: leagueId,
+    season,
+  });
+
+  const response = scoped?.response || [];
+  const exact = response.find(
+    (item: any) => norm(item?.team?.name || "") === norm(canonical)
+  );
+
+  if (exact) {
+    return exact.team.id;
   }
+
+  const includes = response.find((item: any) =>
+    norm(item?.team?.name || "").includes(norm(canonical))
+  );
+
+  if (includes) {
+    return includes.team.id;
+  }
+
+  const global = await apiFootball("/teams", {
+    search: canonical,
+  });
+
+  const globalResponse = global?.response || [];
+  const globalExact = globalResponse.find(
+    (item: any) => norm(item?.team?.name || "") === norm(canonical)
+  );
+
+  if (globalExact) {
+    return globalExact.team.id;
+  }
+
+  const globalIncludes = globalResponse.find((item: any) =>
+    norm(item?.team?.name || "").includes(norm(canonical))
+  );
+
+  if (globalIncludes) {
+    return globalIncludes.team.id;
+  }
+
+  throw new Error(`No encontré el equipo "${teamName}"`);
 }
+
+export function buildDateRange(matchDate?: string) {
+  if (!matchDate) return null;
+
+  const base = new Date(matchDate);
+  if (Number.isNaN(base.getTime())) return null;
+
+  const from = new Date(base);
+  from.setDate(from.getDate() - 3);
+
+  const to = new Date(base);
+  to.setDate(to.getDate() + 3);
+
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
+  return {
+    from: fmt(from),
+    to: fmt(to),
+  };
+}
+
+export async function findFixtureByInput(input: {
+  league: string;
+  country: string;
+  season: string;
+  homeTeam: string;
+  awayTeam: string;
+  matchDate?: string;
+}) {
+  const leagueId = await resolveLeagueId(
+    input.league,
+    input.country,
+    input.season
+  );
+
+  const homeId = await resolveTeamId(input.homeTeam, String(leagueId), input.season);
+  const awayId = await resolveTeamId(input.awayTeam, String(leagueId), input.season);
+
+  let fixtures: any[] = [];
+
+  const range = buildDateRange(input.matchDate);
+
+  if (range) {
+    const byDate = await apiFootball("/fixtures", {
+      league: String(leagueId),
+      season: input.season,
+      from: range.from,
+      to: range.to,
+    });
+
+    fixtures = byDate?.response || [];
+  }
+
+  if (fixtures.length === 0) {
+    const byHome = await apiFootball("/fixtures", {
+      league: String(leagueId),
+      season: input.season,
+      team: String(homeId),
+      last: "50",
+    });
+
+    fixtures = byHome?.response || [];
+  }
+
+  const exact = fixtures.find((f: any) => {
+    const h = f?.teams?.home?.id;
+    const a = f?.teams?.away?.id;
+    return h === homeId && a === awayId;
+  });
+
+  return {
+    leagueId,
+    homeId,
+    awayId,
+    fixture: exact || null,
+    fixturesChecked: fixtures.length,
+  };
+}
+
+export function teamStatsSummary(stats: any) {
+  const playedHome = Number(stats?.fixtures?.played?.home || 0);
+  const playedAway = Number(stats?.fixtures?.played?.away || 0);
+  const gfHome = Number(stats?.goals?.for?.total?.home || 0);
+  const gfAway = Number(stats?.goals?.for?.total?.away || 0);
+  const gaHome = Number(stats?.goals?.against?.total?.home || 0);
+  const gaAway = Number(stats?.goals?.against?.total?.away || 0);
+
+  return {
+    home: {
+      played: playedHome,
+      gf: gfHome,
+      ga: gaHome,
+      gfAvg: playedHome ? gfHome / playedHome : 0,
+      gaAvg: playedHome ? gaHome / playedHome : 0,
+    },
+    away: {
+      played: playedAway,
+      gf: gfAway,
+      ga: gaAway,
+      gfAvg: playedAway ? gfAway / playedAway : 0,
+      gaAvg: playedAway ? gaAway / playedAway : 0,
+    },
+  };
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function poisson(k: number, lambda: number) {
+  return (Math.exp(-lambda) * Math.pow(lambda, k)) / factorial(k);
+}
+
+function factorial(n: number) {
+  if (n <= 1) return 1;
+  let result = 1;
+  for (let i = 2; i <= n; i += 1) result *= i;
+  return result;
+}
+
+export function buildPrediction(homeStats: any, awayStats: any) {
+  const h = teamStatsSummary(homeStats);
+  const a = teamStatsSummary(awayStats);
+
+  const lambdaHome = clamp((h.home.gfAvg + a.away.gaAvg) / 2 || 0.8, 0.15, 3.5);
+  const lambdaAway = clamp((a.away.gfAvg + h.home.gaAvg) / 2 || 0.8, 0.15, 3.5);
+
+  const maxGoals = 5;
+  const matrix: { home: number; away: number; prob: number }[] = [];
+
+  let homeWin = 0;
+  let draw = 0;
+  let awayWin = 0;
+  let over25 = 0;
+  let btts = 0;
+
+  for (let i = 0; i <= maxGoals; i += 1) {
+    for (let j = 0; j <= maxGoals; j += 1) {
+      const prob = poisson(i, lambdaHome) * poisson(j, lambdaAway);
+      matrix.push({ home: i, away: j, prob });
+
+      if (i > j) homeWin += prob;
+      if (i === j) draw += prob;
+      if (i < j) awayWin += prob;
+      if (i + j >= 3) over25 += prob;
+      if (i >= 1 && j >= 1) btts += prob;
+    }
+  }
+
+  const topScores = [...matrix]
+    .sort((x, y) => y.prob - x.prob)
+    .slice(0, 5)
+    .map((item) => ({
+      score: `${item.home}-${item.away}`,
+      probability: item.prob,
+    }));
+
+  const best = topScores[0];
+
+  return {
+    lambdaHome,
+    lambdaAway,
+    probabilities: {
+      homeWin,
+      draw,
+      awayWin,
+      over25,
+      under25: 1 - over25,
+      btts,
+      noBtts: 1 - btts,
+    },
+    topScores,
+    predictedScore: best?.score || "0-0",
+  };
+}
+
