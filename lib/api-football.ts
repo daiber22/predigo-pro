@@ -334,6 +334,14 @@ if (!homeResp || !awayResp) {
         awayGoalsAgainstGeneral: scaleToLast5(awayAgainstGeneral, awayMatchesGeneral),
         awayGoalsForAway: scaleToLast5(awayForAway, awayMatchesAway),
         awayGoalsAgainstAway: scaleToLast5(awayAgainstAway, awayMatchesAway),
+        homeShotsOnTargetGeneral: 0,
+homeBlockedShotsGeneral: 0,
+homeShotsOnTargetHome: 0,
+homeBlockedShotsHome: 0,
+awayShotsOnTargetGeneral: 0,
+awayBlockedShotsGeneral: 0,
+awayShotsOnTargetAway: 0,
+awayBlockedShotsAway: 0,
       },
     };
   } catch (error) {
