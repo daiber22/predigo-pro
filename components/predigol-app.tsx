@@ -50,7 +50,19 @@ type LeagueStatusSnapshot = {
   oddsApiConfigured: boolean;
   leagueStatuses: LeagueQuotaStatus[];
 };
-
+type LeagueSearchResult = {
+  leagueId: number | null;
+  leagueKey: string;
+  league: string;
+  country: string;
+  season: number;
+  logo: string | null;
+  flag: string | null;
+  oddsSportKey: string | null;
+  status: 'mapped' | 'missing_sport_key';
+  source: 'api-football' | 'demo';
+  searchLabel: string;
+};
 const defaultLeague = getLeagueOption('colombia-primera-a') || LEAGUE_OPTIONS[0];
 
 const defaultForm: SearchFormState = {
@@ -113,7 +125,10 @@ export function PredigolApp() {
   const [lastGeneratedProfile, setLastGeneratedProfile] = useState<TicketProfile | null>(null);
   const [connections, setConnections] = useState<ConnectionStatus | null>(null);
   const [leagueSnapshot, setLeagueSnapshot] = useState<LeagueStatusSnapshot | null>(null);
-
+const [leagueSearch, setLeagueSearch] = useState<string>('');
+const [leagueResults, setLeagueResults] = useState<LeagueSearchResult[]>([]);
+const [leagueSearchLoading, setLeagueSearchLoading] = useState(false);
+const [selectedSearchLeague, setSelectedSearchLeague] = useState<LeagueSearchResult | null>(null);
   const selectedLeague = getLeagueOption(form.leagueKey);
   const selectedBookmaker = BOOKMAKER_OPTIONS.find((item) => item.value === oddsControls.bookmakerKey) || BOOKMAKER_OPTIONS[0];
 
@@ -180,7 +195,7 @@ export function PredigolApp() {
   }, [leagueSnapshot]);
 
   const currentLeagueStatus = useMemo(() => {
-    if (!selectedLeague) return undefined;
+  if (selectedLeague) {
     return leagueStatusMap[selectedLeague.key] || (!selectedLeague.oddsSportKey
       ? {
           leagueKey: selectedLeague.key,
@@ -190,19 +205,93 @@ export function PredigolApp() {
           message: 'Esta liga no tiene sport key configurado dentro de la app.',
         }
       : undefined);
-  }, [leagueStatusMap, selectedLeague]);
-
-  function applyLeagueKey(leagueKey: string) {
-    const option = getLeagueOption(leagueKey);
-    setForm((current: SearchFormState) => ({
-      ...current,
-      leagueKey,
-      league: option?.league || current.league,
-      country: option?.country || current.country,
-      season: option?.defaultSeason ? String(option.defaultSeason) : current.season,
-    }));
   }
 
+  if (selectedSearchLeague) {
+    return {
+      leagueKey: selectedSearchLeague.leagueKey,
+      label: selectedSearchLeague.searchLabel,
+      sportKey: selectedSearchLeague.oddsSportKey || undefined,
+      status: selectedSearchLeague.oddsSportKey ? 'unchecked' as const : 'missing_sport_key' as const,
+      message: selectedSearchLeague.oddsSportKey
+        ? 'Liga encontrada desde la API. Ya puedes buscar partido y luego probar cuotas.'
+        : 'Liga encontrada desde la API, pero todavía no tiene sport key mapeado dentro de la app.',
+    };
+  }
+
+  return undefined;
+}, [leagueStatusMap, selectedLeague, selectedSearchLeague]);
+
+ function applyLeagueKey(leagueKey: string) {
+  const option = getLeagueOption(leagueKey);
+  setSelectedSearchLeague(null);
+  setLeagueResults([]);
+  setLeagueSearch('');
+  setForm((current: SearchFormState) => ({
+    ...current,
+    leagueKey,
+    league: option?.league || current.league,
+    country: option?.country || current.country,
+    season: option?.defaultSeason ? String(option.defaultSeason) : current.season,
+  }));
+}
+async function handleSearchLeagues() {
+  const query = leagueSearch.trim();
+
+  if (!query) {
+    setLeagueResults([]);
+    setMessage('Escribe una liga o un país para buscar.');
+    return;
+  }
+
+  setLeagueSearchLoading(true);
+  setMessage('');
+
+  try {
+    const response = await fetch(
+      `/api/ligas?search=${encodeURIComponent(query)}&season=${encodeURIComponent(
+        form.season || String(new Date().getFullYear()),
+      )}`,
+    );
+
+    const payload = await response.json();
+
+    if (!response.ok) {
+      throw new Error(payload.error || 'No se pudieron buscar ligas.');
+    }
+
+    setLeagueResults(payload.results || []);
+    setMessage(
+      payload.results?.length
+        ? `Encontré ${payload.results.length} resultado${payload.results.length === 1 ? '' : 's'} para "${query}".`
+        : `No encontré ligas para "${query}".`,
+    );
+  } catch (error) {
+    setMessage(error instanceof Error ? error.message : 'No se pudieron buscar ligas.');
+  } finally {
+    setLeagueSearchLoading(false);
+  }
+}
+  function applyLeagueSearchResult(result: LeagueSearchResult) {
+  setSelectedSearchLeague(result);
+  setForm((current: SearchFormState) => ({
+    ...current,
+    leagueKey: result.leagueKey,
+    league: result.league,
+    country: result.country,
+    season: String(result.season),
+  }));
+  setFixture(null);
+  setOdds(null);
+  setAnalysis(null);
+  setLeagueSearch(result.searchLabel);
+  setLeagueResults([]);
+  setMessage(
+    result.oddsSportKey
+      ? `Liga seleccionada: ${result.searchLabel}. Quedó enlazada con cuotas por sport key.`
+      : `Liga seleccionada: ${result.searchLabel}. La app puede buscar el partido, pero esa liga todavía no tiene sport key mapeado.`,
+  );
+}
   function toggleMarketFilter(market: OddsMarketKey) {
     setOddsControls((current) => {
       const exists = current.comparisonMarkets.includes(market);
@@ -522,10 +611,70 @@ setMessage(
               <h2>Buscar partido</h2>
             </div>
           </header>
+<div className="fixture-card">
+  <div className="panel-header">
+    <div>
+      <p className="section-kicker">Buscar cualquier liga</p>
+      <h3>Ligas desde API</h3>
+    </div>
+    <span className="pill">Resultados: {leagueResults.length}</span>
+  </div>
 
+  <div className="form-grid">
+    <Input
+      label="Buscar liga o país"
+      value={leagueSearch}
+      onChange={setLeagueSearch}
+    />
+  </div>
+
+  <div className="actions-row">
+    <button
+      className="secondary"
+      onClick={handleSearchLeagues}
+      disabled={leagueSearchLoading}
+    >
+      {leagueSearchLoading ? 'Buscando ligas...' : 'Buscar liga en API'}
+    </button>
+  </div>
+
+  {leagueResults.length ? (
+    <div className="league-status-grid">
+      {leagueResults.map((result) => {
+        const tone = result.oddsSportKey ? 'ok' : 'bad';
+        const active =
+          form.leagueKey === result.leagueKey &&
+          form.league === result.league &&
+          form.country === result.country;
+
+        return (
+          <button
+            key={`${result.leagueKey}-${result.leagueId ?? result.searchLabel}-${result.season}`}
+            type="button"
+            className={`league-status-card tone-${tone} ${active ? 'active' : ''}`}
+            onClick={() => applyLeagueSearchResult(result)}
+          >
+            <div className="league-status-top">
+              <strong>{result.searchLabel}</strong>
+              <span className={`status-badge tone-${tone}`}>
+                {result.oddsSportKey ? 'Sport key OK' : 'Sin sport key'}
+              </span>
+            </div>
+            <small>{result.oddsSportKey || 'No configurado en app'}</small>
+            <p>Temporada {result.season} · Fuente {result.source}</p>
+          </button>
+        );
+      })}
+    </div>
+  ) : (
+    <p className="helper-text">
+      Escribe una liga o un país y luego pulsa “Buscar liga en API”.
+    </p>
+  )}
+</div>
           <div className="form-grid">
             <SelectField
-              label="Liga rápida"
+              label="Liga rápida (opcional)"
               value={form.leagueKey}
               onChange={applyLeagueKey}
               options={LEAGUE_OPTIONS.map((item) => {
