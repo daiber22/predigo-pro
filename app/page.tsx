@@ -694,8 +694,8 @@ function deleteSavedAnalysis(id: string) {
     </div>
   </div>
 </div>
-      <div className={activeTab === "info" ? "grid grid-cols-2 gap-4 items-start" : "hidden"}>
-         <section className={card}>
+     <div style={{ display: activeTab === "info" ? "flex" : "none", gap: "16px", alignItems: "flex-start", width: "100%", overflowX: "auto" }}>
+       <section className={card} style={{ flex: "0 0 50%", minWidth: "430px" }}>
             <h2 className={sectionTitle}>1. Equipo local</h2>
 
             <div className="mb-4 text-sm font-semibold text-cyan-200">General</div>
@@ -777,7 +777,7 @@ function deleteSavedAnalysis(id: string) {
             </div>
           </section>
 
-         <section className={card}>
+        <section className={card} style={{ flex: "0 0 50%", minWidth: "430px" }}>
             <h2 className={sectionTitle}>2. Equipo visitante</h2>
 
             <div className="mb-4 text-sm font-semibold text-cyan-200">General</div>
