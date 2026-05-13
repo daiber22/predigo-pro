@@ -94,11 +94,21 @@ function buildTeamMetrics(team: TeamForm, mode: "local" | "visitante") {
   const ataqueBloqueados = 0.4 * rbFavorGeneral + 0.6 * rbFavorSplit;
   const defensaBloqueados = 0.4 * rbContraGeneral + 0.6 * rbContraSplit;
 
-  const compAtaque = ataqueRemates / 3.2 + ataqueBloqueados / 8;
-  const compDefensa = defensaRemates / 3.2 + defensaBloqueados / 8;
+ const compRematesAtaque = ataqueRemates / 3.2;
+const compBloqueadosAtaque = ataqueBloqueados / 8;
 
-  const fuerzaAtaque = 0.7 * ataqueGoles + 0.3 * compAtaque;
-  const fuerzaDefensa = 0.7 * defensaGoles + 0.3 * compDefensa;
+const compRematesDefensa = defensaRemates / 3.2;
+const compBloqueadosDefensa = defensaBloqueados / 8;
+
+const fuerzaAtaque =
+  0.70 * ataqueGoles +
+  0.25 * compRematesAtaque +
+  0.05 * compBloqueadosAtaque;
+
+const fuerzaDefensa =
+  0.70 * defensaGoles +
+  0.25 * compRematesDefensa +
+  0.05 * compBloqueadosDefensa;
 
   return {
     mode,
@@ -127,8 +137,10 @@ function buildTeamMetrics(team: TeamForm, mode: "local" | "visitante") {
       defensaRemates,
       ataqueBloqueados,
       defensaBloqueados,
-      compAtaque,
-      compDefensa,
+     compRematesAtaque,
+compBloqueadosAtaque,
+compRematesDefensa,
+compBloqueadosDefensa,
       fuerzaAtaque,
       fuerzaDefensa,
     },
