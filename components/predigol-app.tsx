@@ -1149,20 +1149,27 @@ function StatEditor({
   onUpdate: (patch: Partial<TeamStatsInput>) => void;
 }) {
   const prefix = side === 'home' ? 'home' : 'away';
-  const labels = side === 'home'
-    ? [
-        ['homeGoalsForGeneral', 'GF general'],
-        ['homeGoalsAgainstGeneral', 'GC general'],
-        ['homeGoalsForHome', 'GF local'],
-        ['homeGoalsAgainstHome', 'GC local'],
-      ]
-    : [
-        ['awayGoalsForGeneral', 'GF general'],
-        ['awayGoalsAgainstGeneral', 'GC general'],
-        ['awayGoalsForAway', 'GF visita'],
-        ['awayGoalsAgainstAway', 'GC visita'],
-      ];
-
+ const labels = side === 'home'
+  ? [
+      ['homeGoalsForGeneral', 'GF general'],
+      ['homeGoalsAgainstGeneral', 'GC general'],
+      ['homeGoalsForHome', 'GF local'],
+      ['homeGoalsAgainstHome', 'GC local'],
+      ['homeShotsOnTargetGeneral', 'Remates a puerta general'],
+      ['homeBlockedShotsGeneral', 'Remates bloqueados general'],
+      ['homeShotsOnTargetHome', 'Remates a puerta local'],
+      ['homeBlockedShotsHome', 'Remates bloqueados local'],
+    ]
+  : [
+      ['awayGoalsForGeneral', 'GF general'],
+      ['awayGoalsAgainstGeneral', 'GC general'],
+      ['awayGoalsForAway', 'GF visita'],
+      ['awayGoalsAgainstAway', 'GC visita'],
+      ['awayShotsOnTargetGeneral', 'Remates a puerta general'],
+      ['awayBlockedShotsGeneral', 'Remates bloqueados general'],
+      ['awayShotsOnTargetAway', 'Remates a puerta visita'],
+      ['awayBlockedShotsAway', 'Remates bloqueados visita'],
+    ];
   return (
     <div className="stat-card">
       <h3>{title}</h3>
