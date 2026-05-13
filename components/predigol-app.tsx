@@ -131,6 +131,33 @@ const [leagueSearchLoading, setLeagueSearchLoading] = useState(false);
 const [selectedSearchLeague, setSelectedSearchLeague] = useState<LeagueSearchResult | null>(null);
   const selectedLeague = getLeagueOption(form.leagueKey);
   const selectedBookmaker = BOOKMAKER_OPTIONS.find((item) => item.value === oddsControls.bookmakerKey) || BOOKMAKER_OPTIONS[0];
+  const quickLeagueOptions = useMemo(() => {
+  const baseOptions = LEAGUE_OPTIONS.map((item) => {
+    const status =
+      leagueStatusMap[item.key]?.status || (!item.oddsSportKey ? 'missing_sport_key' : 'unchecked');
+
+    return {
+      value: item.key,
+      label: `${getStatusIcon(status)} ${item.label}`,
+    };
+  });
+
+  if (selectedSearchLeague) {
+    const exists = baseOptions.some((item) => item.value === selectedSearchLeague.leagueKey);
+
+    if (!exists) {
+      return [
+        {
+          value: selectedSearchLeague.leagueKey,
+          label: `🔎 ${selectedSearchLeague.searchLabel}`,
+        },
+        ...baseOptions,
+      ];
+    }
+  }
+
+  return baseOptions;
+}, [leagueStatusMap, selectedSearchLeague]);
 
   useEffect(() => {
     const savedTicket = window.localStorage.getItem(ticketStorageKey);
@@ -677,13 +704,7 @@ setMessage(
               label="Liga rápida (opcional)"
               value={form.leagueKey}
               onChange={applyLeagueKey}
-              options={LEAGUE_OPTIONS.map((item) => {
-                const status = leagueStatusMap[item.key]?.status || (!item.oddsSportKey ? 'missing_sport_key' : 'unchecked');
-                return {
-                  value: item.key,
-                  label: `${getStatusIcon(status)} ${item.label}`,
-                };
-              })}
+            options={quickLeagueOptions}
             />
             <Input label="Temporada" value={form.season} onChange={(value) => setForm({ ...form, season: value })} />
             <Input label="Equipo local" value={form.homeTeam} onChange={(value) => setForm({ ...form, homeTeam: value })} />
