@@ -283,7 +283,19 @@ const homeResp = Array.isArray(homeStats?.response)
     const awayResp = Array.isArray(awayStats?.response)
   ? awayStats.response[0]
   : awayStats?.response || awayStats;
+const homeCount = Array.isArray(homeStats?.response)
+  ? homeStats.response.length
+  : homeStats?.response ? 1 : 0;
 
+const awayCount = Array.isArray(awayStats?.response)
+  ? awayStats.response.length
+  : awayStats?.response ? 1 : 0;
+
+if (!homeResp || !awayResp) {
+  throw new Error(
+    `Stats vacias API-Football | league=${resolvedLeagueId} season=${season} homeTeam=${home?.id} awayTeam=${away?.id} homeCount=${homeCount} awayCount=${awayCount}`
+  );
+}
     const homeForGeneral = Number(homeResp?.goals?.for?.total?.total ?? 0);
     const homeAgainstGeneral = Number(homeResp?.goals?.against?.total?.total ?? 0);
     const homeMatchesGeneral = Number(homeResp?.fixtures?.played?.total ?? 1);
