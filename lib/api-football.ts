@@ -260,12 +260,10 @@ export async function searchFixtureWithStats(input: TeamSearchInput): Promise<Fi
       }
       throw new Error('No pude resolver los dos equipos en API-Football. Revisa nombres, liga o país.');
     }
-
-    const fixture = await findFixture(home.id, away.id, season, league?.id, resolvedInput);
-    const resolvedLeagueId =
-  fixture?.league?.id ||
-  league?.id ||
-  (resolvedInput.leagueKey === 'colombia-primera-a' ? 239 : undefined);
+const preferredLeagueId =
+  resolvedInput.leagueKey === 'colombia-primera-a' ? 239 : league?.id;
+ const fixture = await findFixture(home.id, away.id, season, preferredLeagueId, resolvedInput);
+    const resolvedLeagueId = fixture?.league?.id || preferredLeagueId;
 
     if (!resolvedLeagueId) {
       if (DEMO_FALLBACK) {
