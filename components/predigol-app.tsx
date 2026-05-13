@@ -847,7 +847,7 @@ setMessage(
               <StatEditor title={fixture.stats.awayTeam} side="away" stats={fixture.stats} onUpdate={updateStats} />
             </div>
           ) : (
-            <EmptyState text="Primero busca un partido para cargar estadísticas." />
+            <EmptyState text={message || 'Primero busca un partido para cargar estadísticas.'} />
           )}
 
           <div className="actions-row">
