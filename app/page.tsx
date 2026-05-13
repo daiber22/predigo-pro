@@ -47,6 +47,91 @@ function poisson(k: number, lambda: number) {
 function pct(value: number) {
   return `${(value * 100).toFixed(1)}%`;
 }
+function buildReading(result: any) {
+  const p = result.probabilities;
+
+  const diffLocalVisitante = Math.abs(p.local - p.visitante);
+  const totalLambda = result.lambdaLocal + result.lambdaVisitante;
+  const diffLambda = Math.abs(result.lambdaLocal - result.lambdaVisitante);
+
+  let main = "Partido equilibrado";
+  const notes: string[] = [];
+
+  if (diffLocalVisitante <= 0.05 && p.empate >= 0.23) {
+    main = "Partido parejo con riesgo de empate";
+  } else if (p.local > p.visitante && p.local >= 0.42) {
+    main = "Ventaja local clara";
+  } else if (p.visitante > p.local && p.visitante >= 0.42) {
+    main = "Ventaja visitante clara";
+  } else if (p.local > p.visitante) {
+    main = "Leve ventaja local";
+  } else if (p.visitante > p.local) {
+    main = "Leve ventaja visitante";
+  }
+
+  if (p.empate >= 0.28) {
+    notes.push("El empate tiene peso alto en el modelo.");
+  } else if (p.empate >= 0.24) {
+    notes.push("El empate está presente como escenario importante.");
+  }
+
+  if (p.over25 >= 0.58) {
+    notes.push("Tendencia fuerte a Over 2.5 goles.");
+  } else if (p.over25 >= 0.53) {
+    notes.push("Tendencia moderada a Over 2.5 goles.");
+  } else if (p.under25 >= 0.55) {
+    notes.push("Tendencia a Under 2.5 goles.");
+  }
+
+  if (p.btts >= 0.58) {
+    notes.push("Ambos marcan tiene señal fuerte.");
+  } else if (p.btts >= 0.53) {
+    notes.push("Ambos marcan tiene señal moderada.");
+  } else if (p.noBtts >= 0.55) {
+    notes.push("Hay tendencia a que no marquen ambos.");
+  }
+
+  if (totalLambda >= 2.8) {
+    notes.push("La proyección total de goles es alta.");
+  } else if (totalLambda <= 2.1) {
+    notes.push("La proyección total de goles es baja.");
+  }
+
+  if (diffLambda <= 0.15) {
+    notes.push("Los goles esperados están muy parejos.");
+  }
+
+  if (notes.length === 0) {
+    notes.push("No hay una señal dominante; conviene revisar el top de marcadores.");
+  }
+
+  return {
+    main,
+    notes,
+  };
+}
+
+function ReadingPanel({ result }: { result: any }) {
+  const reading = buildReading(result);
+
+  return (
+    <div className="rounded-xl border border-cyan-500/20 bg-slate-950 p-4">
+      <div className="mb-2 font-semibold text-white">
+        Lectura recomendada del partido
+      </div>
+
+      <div className="text-xl font-bold text-cyan-300">
+        {reading.main}
+      </div>
+
+      <div className="mt-3 space-y-2 text-sm text-slate-300">
+        {reading.notes.map((note: string, index: number) => (
+          <div key={index}>• {note}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function buildInitialTeam(): TeamForm {
   return {
@@ -519,7 +604,7 @@ export default function Page() {
                     <div>Ambos marcan: <strong>{pct(result.probabilities.btts)}</strong></div>
                   </div>
                 </div>
-
+<ReadingPanel result={result} />
                 <div className="rounded-xl border border-slate-700 bg-slate-950 p-4">
                   <div className="mb-2 font-semibold text-white">Top 5 marcadores</div>
                   <div className="space-y-2 text-sm">
