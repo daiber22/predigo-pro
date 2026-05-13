@@ -131,33 +131,7 @@ const [leagueSearchLoading, setLeagueSearchLoading] = useState(false);
 const [selectedSearchLeague, setSelectedSearchLeague] = useState<LeagueSearchResult | null>(null);
   const selectedLeague = getLeagueOption(form.leagueKey);
   const selectedBookmaker = BOOKMAKER_OPTIONS.find((item) => item.value === oddsControls.bookmakerKey) || BOOKMAKER_OPTIONS[0];
-  const quickLeagueOptions = useMemo(() => {
-  const baseOptions = LEAGUE_OPTIONS.map((item) => {
-    const status =
-      leagueStatusMap[item.key]?.status || (!item.oddsSportKey ? 'missing_sport_key' : 'unchecked');
 
-    return {
-      value: item.key,
-      label: `${getStatusIcon(status)} ${item.label}`,
-    };
-  });
-
-  if (selectedSearchLeague) {
-    const exists = baseOptions.some((item) => item.value === selectedSearchLeague.leagueKey);
-
-    if (!exists) {
-      return [
-        {
-          value: selectedSearchLeague.leagueKey,
-          label: `🔎 ${selectedSearchLeague.searchLabel}`,
-        },
-        ...baseOptions,
-      ];
-    }
-  }
-
-  return baseOptions;
-}, [leagueStatusMap, selectedSearchLeague]);
 
   useEffect(() => {
     const savedTicket = window.localStorage.getItem(ticketStorageKey);
@@ -216,6 +190,33 @@ const [selectedSearchLeague, setSelectedSearchLeague] = useState<LeagueSearchRes
   const leagueStatusMap = useMemo(() => {
     return Object.fromEntries((leagueSnapshot?.leagueStatuses || []).map((item) => [item.leagueKey, item])) as Record<string, LeagueQuotaStatus>;
   }, [leagueSnapshot]);
+  const quickLeagueOptions = useMemo(() => {
+  const baseOptions = LEAGUE_OPTIONS.map((item) => {
+    const status =
+      leagueStatusMap[item.key]?.status || (!item.oddsSportKey ? 'missing_sport_key' : 'unchecked');
+
+    return {
+      value: item.key,
+      label: `${getStatusIcon(status)} ${item.label}`,
+    };
+  });
+
+  if (selectedSearchLeague) {
+    const exists = baseOptions.some((item) => item.value === selectedSearchLeague.leagueKey);
+
+    if (!exists) {
+      return [
+        {
+          value: selectedSearchLeague.leagueKey,
+          label: `🔎 ${selectedSearchLeague.searchLabel}`,
+        },
+        ...baseOptions,
+      ];
+    }
+  }
+
+  return baseOptions;
+}, [leagueStatusMap, selectedSearchLeague]);
 
   const validatedLeagueCount = useMemo(() => {
     return leagueSnapshot?.leagueStatuses.filter((item) => item.status === 'ok').length || 0;
