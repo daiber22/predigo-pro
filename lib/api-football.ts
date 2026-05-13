@@ -262,7 +262,10 @@ export async function searchFixtureWithStats(input: TeamSearchInput): Promise<Fi
     }
 
     const fixture = await findFixture(home.id, away.id, season, league?.id, resolvedInput);
-    const resolvedLeagueId = fixture?.league?.id || league?.id;
+    const resolvedLeagueId =
+  fixture?.league?.id ||
+  league?.id ||
+  (resolvedInput.leagueKey === 'colombia-primera-a' ? 239 : undefined);
 
     if (!resolvedLeagueId) {
       if (DEMO_FALLBACK) {
