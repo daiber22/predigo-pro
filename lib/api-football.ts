@@ -163,8 +163,47 @@ function chooseFixture(fixtures: ApiFootballFixture[], awayTeamId?: number, inpu
 }
 
 async function findTeam(teamName: string, country?: string) {
-  const response = await fetchApiFootball(`/teams?search=${encodeURIComponent(teamName)}`);
-  return selectTeamCandidate(response.response, teamName, country)?.team;
+  const normalizedName = teamName
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b(fc|cf|cd|sc|ac)\b/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const aliasMap: Record<string, string[]> = {
+    junior: ['Junior', 'Junior FC', 'Atletico Junior'],
+    'once caldas': ['Once Caldas', 'Once Caldas Manizales'],
+    'santa fe': ['Santa Fe', 'Independiente Santa Fe'],
+    'america de cali': ['America de Cali', 'América de Cali'],
+    america: ['America de Cali', 'América de Cali'],
+  };
+
+  const searchTerms = Array.from(
+    new Set(
+      [
+        teamName,
+        teamName.normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
+        ...(aliasMap[normalizedName] || []),
+      ]
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+
+  for (const searchTerm of searchTerms) {
+    const response = await fetchApiFootball(`/teams?search=${encodeURIComponent(searchTerm)}`);
+    const candidate =
+      selectTeamCandidate(response.response, teamName, country)?.team ||
+      selectTeamCandidate(response.response, searchTerm, country)?.team;
+
+    if (candidate?.id) {
+      return candidate;
+    }
+  }
+
+  return undefined;
 }
 
 async function findLeague(input: TeamSearchInput, season: number) {
