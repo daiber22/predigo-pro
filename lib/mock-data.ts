@@ -39,6 +39,14 @@ export function buildMockFixture(input: TeamSearchInput): FixtureMatch {
       awayGoalsAgainstGeneral: 5,
       awayGoalsForAway: 8,
       awayGoalsAgainstAway: 4,
+      homeShotsOnTargetGeneral: 0,
+homeBlockedShotsGeneral: 0,
+homeShotsOnTargetHome: 0,
+homeBlockedShotsHome: 0,
+awayShotsOnTargetGeneral: 0,
+awayBlockedShotsGeneral: 0,
+awayShotsOnTargetAway: 0,
+awayBlockedShotsAway: 0,
     },
   };
 }
