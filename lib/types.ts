@@ -19,6 +19,14 @@ export type TeamStatsInput = {
   awayGoalsAgainstGeneral: number;
   awayGoalsForAway: number;
   awayGoalsAgainstAway: number;
+  homeShotsOnTargetGeneral: number;
+homeBlockedShotsGeneral: number;
+homeShotsOnTargetHome: number;
+homeBlockedShotsHome: number;
+awayShotsOnTargetGeneral: number;
+awayBlockedShotsGeneral: number;
+awayShotsOnTargetAway: number;
+awayBlockedShotsAway: number;
 };
 
 export type OddsMarketKey = '1x2' | 'totals' | 'btts' | 'double_chance';
